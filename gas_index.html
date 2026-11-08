@@ -283,10 +283,39 @@ body {
 }
 .keypad-btn:hover { background-color: #eff6ff; border-color: var(--primary-color); transform: translateY(-2px); }
 .keypad-btn:active { transform: translateY(0); }
-.keypad-btn.delete-btn {
-  grid-column: span 2; font-size: 0.95rem; background-color: #fee2e2; color: #991b1b; border-color: #fca5a5;
+.keypad-btn.special-btn {
+  background-color: #f0fdf4;
+  color: #15803d;
+  border-color: #bbf7d0;
+  font-family: "Times New Roman", Times, "Cambria Math", serif;
+  font-style: italic;
+  font-size: 1.35rem;
 }
-.keypad-btn.delete-btn:hover { background-color: #fecaca; }
+
+.keypad-btn.special-btn:hover {
+  background-color: #dcfce7;
+  border-color: #86efac;
+}
+
+.keypad-btn.action-btn {
+  grid-column: span 3;
+}
+
+.keypad-btn.minus-btn {
+  background-color: #f1f5f9;
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
+.keypad-btn.delete-btn {
+  font-size: 0.95rem;
+  background-color: #fee2e2;
+  color: #991b1b;
+  border-color: #fca5a5;
+}
+.keypad-btn.delete-btn:hover {
+  background-color: #fecaca;
+}
 
 .mark-submit-btn { width: 100%; max-width: 360px; margin-top: 6px; }
 .mark-submit-btn:disabled {
@@ -413,8 +442,6 @@ body {
           <div class="mark-instruction">枠をタップして、数字または符号を入力してください（キーボード入力可）</div>
           <div class="mark-slots-wrapper" id="markSlotsWrapper"></div>
           <div class="mark-keypad" id="markKeypad">
-            <button type="button" class="keypad-btn" data-key="-">−</button>
-            <button type="button" class="keypad-btn" data-key="0">0</button>
             <button type="button" class="keypad-btn" data-key="1">1</button>
             <button type="button" class="keypad-btn" data-key="2">2</button>
             <button type="button" class="keypad-btn" data-key="3">3</button>
@@ -424,7 +451,11 @@ body {
             <button type="button" class="keypad-btn" data-key="7">7</button>
             <button type="button" class="keypad-btn" data-key="8">8</button>
             <button type="button" class="keypad-btn" data-key="9">9</button>
-            <button type="button" class="keypad-btn delete-btn" data-key="backspace">⌫ 戻る</button>
+            <button type="button" class="keypad-btn" data-key="0">0</button>
+            <button type="button" class="keypad-btn special-btn" data-key="π">π</button>
+            <button type="button" class="keypad-btn special-btn" data-key="e">e</button>
+            <button type="button" class="keypad-btn action-btn minus-btn" data-key="-">−</button>
+            <button type="button" class="keypad-btn action-btn delete-btn" data-key="backspace">⌫ 戻る</button>
           </div>
           <button type="button" class="primary-btn mark-submit-btn" id="markSubmitBtn" disabled>解答を送信する</button>
         </div>
@@ -764,6 +795,10 @@ window.addEventListener("keydown", (e) => {
     inputMarkKey(key);
   } else if (key === "-" || key === "−") {
     inputMarkKey("-");
+  } else if (key.toLowerCase() === "e") {
+    inputMarkKey("e");
+  } else if (key.toLowerCase() === "p" || key === "π" || key === "Π") {
+    inputMarkKey("π");
   } else if (key === "Backspace" || key === "Delete") {
     inputMarkKey("backspace");
   } else if (key === "Enter" && !markSubmitBtnEl.disabled) {

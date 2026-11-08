@@ -14,7 +14,7 @@ const GAS_WEB_APP_URL = "https://script.google.com/a/macros/hjs.ed.jp/s/AKfycbxq
 const DEMO_QUESTIONS_LIST = [
   { questionId: "demo-001", round: "第1回", title: "2次関数の頂点", type: "4択", isPassed: true },
   { questionId: "demo-002", round: "第2回", title: "判別式と解の個数", type: "2択", isPassed: false },
-  { questionId: "demo-003", round: "第3回", title: "三角比の基本（穴埋め）", type: "マーク式", isPassed: false }
+  { questionId: "demo-003", round: "第3回", title: "三角比・円周率（穴埋め）", type: "マーク式", isPassed: false }
 ];
 
 const DEMO_QUESTION_DETAIL = {
@@ -43,7 +43,7 @@ const DEMO_QUESTION_DETAIL = {
     type: "マーク式",
     imageUrl: "",
     choices: ["ア", "イ"], // スロットのラベル
-    correctAnswer: "1, 2"
+    correctAnswer: "1, π"
   }
 };
 
@@ -180,8 +180,13 @@ async function submitAnswer(answerText) {
 
   if (!GAS_WEB_APP_URL || GAS_WEB_APP_URL.trim() === "") {
     await new Promise((resolve) => setTimeout(resolve, 600));
-    const cleanStudent = String(answerText).replace(/[\s,、\-_ー−]/g, "").toUpperCase();
-    const cleanCorrect = String(currentQuestion.correctAnswer).replace(/[\s,、\-_ー−]/g, "").toUpperCase();
+    const normalize = (str) => String(str)
+      .replace(/[\s,、\-_ー−]/g, "")
+      .replace(/パイ/g, "PI")
+      .toUpperCase()
+      .replace(/PI/g, "Π");
+    const cleanStudent = normalize(answerText);
+    const cleanCorrect = normalize(currentQuestion.correctAnswer);
     const isCorrect = (cleanStudent === cleanCorrect);
     renderResult({
       isCorrect: isCorrect,
@@ -432,6 +437,10 @@ window.addEventListener("keydown", (e) => {
     inputMarkKey(key);
   } else if (key === "-" || key === "−") {
     inputMarkKey("-");
+  } else if (key.toLowerCase() === "e") {
+    inputMarkKey("e");
+  } else if (key.toLowerCase() === "p" || key === "π" || key === "Π") {
+    inputMarkKey("π");
   } else if (key === "Backspace" || key === "Delete") {
     inputMarkKey("backspace");
   } else if (key === "Enter" && !markSubmitBtnEl.disabled) {

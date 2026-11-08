@@ -110,10 +110,16 @@ function submitAnswerServer(questionId, selectedChoice) {
   // 1. 通常の完全一致
   let isCorrect = (studentAnswer.toUpperCase() === correctAnswer.toUpperCase());
 
-  // 2. マーク式用の正規化（カンマ、空白、ハイフン、全角記号を除去・統一して比較）
+  // 2. マーク式用の正規化（カンマ、空白、ハイフン、全角記号、π/pi、e/E を統一して比較）
   if (!isCorrect) {
-    const cleanStudent = studentAnswer.replace(/[\s,、\-_ー−]/g, "").toUpperCase();
-    const cleanCorrect = correctAnswer.replace(/[\s,、\-_ー−]/g, "").toUpperCase();
+    const normalize = (str) => String(str)
+      .replace(/[\s,、\-_ー−]/g, "")
+      .replace(/パイ/g, "PI")
+      .toUpperCase()
+      .replace(/PI/g, "Π");
+
+    const cleanStudent = normalize(studentAnswer);
+    const cleanCorrect = normalize(correctAnswer);
     if (cleanStudent !== "" && cleanStudent === cleanCorrect) {
       isCorrect = true;
     }

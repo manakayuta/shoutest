@@ -528,8 +528,31 @@ body {
   transform: translateY(0);
 }
 
+.keypad-btn.special-btn {
+  background-color: #f0fdf4;
+  color: #15803d;
+  border-color: #bbf7d0;
+  font-family: "Times New Roman", Times, "Cambria Math", serif;
+  font-style: italic;
+  font-size: 1.35rem;
+}
+
+.keypad-btn.special-btn:hover {
+  background-color: #dcfce7;
+  border-color: #86efac;
+}
+
+.keypad-btn.action-btn {
+  grid-column: span 3;
+}
+
+.keypad-btn.minus-btn {
+  background-color: #f1f5f9;
+  font-size: 1.35rem;
+  font-weight: 800;
+}
+
 .keypad-btn.delete-btn {
-  grid-column: span 2;
   font-size: 0.95rem;
   background-color: #fee2e2;
   color: #991b1b;
