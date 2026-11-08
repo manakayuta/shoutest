@@ -267,8 +267,8 @@ ${customPrompt ? `- 追加指示: ${customPrompt}` : ""}
       }
     };
 
-    // Gemini API リクエスト（gemini-1.5-flash / gemini-2.0-flash の順で試行）
-    const modelCandidates = ["gemini-1.5-flash", "gemini-2.0-flash"];
+    // Gemini API リクエスト（Google最新指定の gemini-3.8-flash を最優先）
+    const modelCandidates = ["gemini-3.8-flash", "gemini-1.5-flash", "gemini-2.0-flash"];
     let response = null;
     let lastErrorMsg = "";
 
