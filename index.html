@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>数学 復習テスト</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- 背景演出用キャンバス（紙吹雪やパーティクル演出） -->
+  <canvas id="effectCanvas"></canvas>
+
+  <div class="app-container">
+    <header class="app-header">
+      <div class="badge">数学 授業前チェック</div>
+      <h1 class="app-title">復習小テスト</h1>
+    </header>
+
+    <main class="main-card">
+      <!-- 1. ローディング画面 -->
+      <section id="loadingScreen" class="screen active">
+        <div class="spinner-wrapper">
+          <div class="spinner"></div>
+          <p class="loading-text">本日の問題を読み込んでいます...</p>
+        </div>
+      </section>
+
+      <!-- 2. 出題画面 -->
+      <section id="questionScreen" class="screen">
+        <div class="question-header">
+          <span class="question-number" id="questionNumber">問題</span>
+          <span class="instruction">正しい選択肢を1つ選んでください</span>
+        </div>
+
+        <!-- 問題画像表示エリア -->
+        <div class="image-container">
+          <img id="questionImage" src="" alt="問題の数式" loading="eager">
+          <div id="imageLoader" class="image-loader">
+            <div class="spinner-small"></div>
+            <span>画像を読み込み中...</span>
+          </div>
+        </div>
+
+        <!-- 4つの選択肢ボタンエリア -->
+        <div class="choices-container" id="choicesContainer">
+          <!-- JavaScriptで動的に選択肢ボタン（4つ）を生成します -->
+        </div>
+
+        <!-- 送信中オーバーレイ（二重送信防止＆インジケーター） -->
+        <div id="submittingOverlay" class="submitting-overlay hidden">
+          <div class="spinner-small"></div>
+          <span>解答を送信中...</span>
+        </div>
+      </section>
+
+      <!-- 3. 結果画面 -->
+      <section id="resultScreen" class="screen">
+        <div class="result-card" id="resultCard">
+          <div class="result-icon-wrapper" id="resultIconWrapper">
+            <!-- JSで正解（⭕️/トロフィー）や不正解（❌/ファイト）のアイコンを表示 -->
+            <span id="resultIcon" class="result-icon">🎉</span>
+          </div>
+          <h2 id="resultTitle" class="result-title">正解！</h2>
+          <p id="resultMessage" class="result-message">素晴らしい！しっかり復習できていますね。</p>
+
+          <div class="answer-detail">
+            <span class="detail-label">正解:</span>
+            <span id="correctAnswerText" class="detail-value">選択肢B</span>
+          </div>
+
+          <div class="next-step-box">
+            <p>解答が記録されました。</p>
+            <p class="sub-text">画面をそのままにして先生の指示を待ってください。</p>
+          </div>
+
+          <!-- デモ・確認用（開発時にリセットして再度試すボタン） -->
+          <button id="retryBtn" class="retry-btn">もう一度解き直す（テスト用）</button>
+        </div>
+      </section>
+
+      <!-- エラー画面 -->
+      <section id="errorScreen" class="screen">
+        <div class="error-box">
+          <span class="error-icon">⚠️</span>
+          <h3>データの取得に失敗しました</h3>
+          <p id="errorMessage">ネットワーク環境を確認してください。</p>
+          <button id="reloadBtn" class="primary-btn">再読み込み</button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="app-footer">
+      <div id="demoNotice" class="demo-notice hidden">
+        💡 現在は<strong>【デモモード】</strong>で動作しています（GAS未設定でもテスト可能）
+      </div>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
