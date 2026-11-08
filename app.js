@@ -102,9 +102,7 @@ async function fetchQuestion() {
   try {
     const response = await fetch(`${GAS_WEB_APP_URL}?action=getQuestion`, {
       method: "GET",
-      headers: {
-        "Accept": "application/json"
-      }
+      redirect: "follow"
     });
 
     if (!response.ok) {
