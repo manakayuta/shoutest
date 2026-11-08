@@ -133,7 +133,7 @@ function submitAnswerServer(questionId, selectedChoice) {
     studentEmail,
     questionId,
     title,
-    studentAnswer,
+    "'" + studentAnswer, // 先頭にシングルクォートを付与してスプレッドシートの日付自動変換を防止
     resultText
   ]);
 
