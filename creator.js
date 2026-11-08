@@ -1,7 +1,7 @@
 // ========================================================
-// 数学小テスト 問題作成スタジオ ロジック v3.1 (creator.js)
+// 数学小テスト 問題作成スタジオ ロジック v3.2 (creator.js)
 // GAS (HtmlService iframe) / ローカル両対応・完全版
-// 生徒用画面 (index.html) と同一の純粋ES構文・addEventListener統一構成
+// 生徒用画面 (index.html) と同一の純粋ES構文・テンプレートリテラル排除版
 // ========================================================
 
 const STORAGE_KEY_API = "quick_quiz_gemini_api_key";
@@ -92,7 +92,7 @@ function resetPasteBoxState() {
     box.classList.remove("paste-ready");
     box.setAttribute("data-placeholder", "💡 ここをクリックして Ctrl + V（または右クリック→貼り付け）");
   }
-  setPasteStatus("🟢 動作準備OK (v3.1) — ファイル選択 / D&D / Ctrl+V すべて対応", "ready");
+  setPasteStatus("🟢 動作準備OK (v3.2) — ファイル選択 / D&D / Ctrl+V すべて対応", "ready");
 }
 
 // ==========================================
@@ -371,8 +371,8 @@ function initCreatorApp() {
       manualCopyBtn.addEventListener("click", handleManualCopyClick);
     }
 
-    setVersionBadge("教員用ツール v3.1 (🟢 動作準備OK)", "badge-ready");
-    setPasteStatus("🟢 動作準備OK (v3.1) — ファイル選択 / D&D / Ctrl+V すべて対応", "ready");
+    setVersionBadge("教員用ツール v3.2 (🟢 動作準備OK)", "badge-ready");
+    setPasteStatus("🟢 動作準備OK (v3.2) — ファイル選択 / D&D / Ctrl+V すべて対応", "ready");
 
     // ブラウザの遅延自動入力（オートフィル）対策
     [300, 1000, 2500].forEach(function (delay) {
@@ -384,7 +384,7 @@ function initCreatorApp() {
   } catch (err) {
     const msg = err && err.message ? err.message : String(err);
     console.error("Creator init error:", err);
-    setVersionBadge("教員用ツール v3.1 (🔴 起動エラー: " + msg + ")", "badge-error");
+    setVersionBadge("教員用ツール v3.2 (🔴 起動エラー: " + msg + ")", "badge-error");
     setPasteStatus("🔴 起動エラー: " + msg, "error");
   }
 }
@@ -392,7 +392,7 @@ function initCreatorApp() {
 window.addEventListener("error", function (e) {
   if (!isAppInitialized) {
     const msg = (e && e.message) ? e.message : "不明なエラー";
-    setVersionBadge("教員用ツール v3.1 (🔴 エラー: " + msg + ")", "badge-error");
+    setVersionBadge("教員用ツール v3.2 (🔴 エラー: " + msg + ")", "badge-error");
     setPasteStatus("🔴 エラー: " + msg, "error");
   }
 });
@@ -686,7 +686,7 @@ function callGeminiWithFallback(modelCandidates, idx, apiKey, requestBody, lastE
     return Promise.reject(new Error("Gemini API エラー: " + (lastErrorMsg || "不明なエラー")));
   }
   const model = modelCandidates[idx];
-  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  const apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(apiKey);
 
   return fetch(apiUrl, {
     method: "POST",
@@ -838,7 +838,8 @@ function handleGenerateClick() {
     })
     .catch(function (error) {
       console.error("生成エラー:", error);
-      alert(`生成に失敗しました: ${error.message}`);
+      const errMsg = (error && error.message) ? error.message : String(error);
+      alert("生成に失敗しました: " + errMsg);
       if (loadingBox) loadingBox.classList.add("hidden");
       if (placeholderBox) placeholderBox.classList.remove("hidden");
     })
@@ -962,7 +963,7 @@ function uploadProblemImage(folderUrl, problemImageBase64) {
             warning: "⚠️ Googleドライブ自動保存に失敗しました（" + errMsg + "）。代わりに画像をPCへダウンロード保存しました。"
           });
         })
-        .uploadImageServer(folderUrl, problemImageBase64, `quiz_${Date.now()}.png`);
+        .uploadImageServer(folderUrl, problemImageBase64, "quiz_" + Date.now() + ".png");
     });
   }
 
@@ -970,7 +971,7 @@ function uploadProblemImage(folderUrl, problemImageBase64) {
     action: "uploadImage",
     folderUrl: folderUrl,
     base64Image: problemImageBase64,
-    filename: `quiz_${Date.now()}.png`
+    filename: "quiz_" + Date.now() + ".png"
   };
 
   return fetch(DEFAULT_GAS_URL, {
@@ -1047,7 +1048,7 @@ function handleExportClick() {
 
       if (!finalImageUrl) {
         finalImageUrl = "（Googleドライブ保存完了後にURLが入ります）";
-        downloadBase64Image(bundle.problemImageBase64, `${title}_問題.png`);
+        downloadBase64Image(bundle.problemImageBase64, title + "_問題.png");
       }
 
       if (driveWarning && exportWarningMessage) {
@@ -1096,7 +1097,8 @@ function handleExportClick() {
     })
     .catch(function (err) {
       console.error("エクスポートエラー:", err);
-      alert(`保存・コピー処理中にエラーが発生しました: ${err.message}`);
+      const errMsg = (err && err.message) ? err.message : String(err);
+      alert("保存・コピー処理中にエラーが発生しました: " + errMsg);
       if (exportBtnText) exportBtnText.textContent = "Googleドライブに保存して、C列貼り付けデータをコピー！";
     })
     .then(function () {
