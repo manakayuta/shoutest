@@ -7,42 +7,58 @@
 // ==========================================
 // 1. 設定項目
 // ==========================================
-// GASのWebアプリをデプロイしたら、ここに発行されたURLを貼り付けてください。
-// 空文字 "" の状態では自動的に【デモモード】として動作し、動作テストが可能です。
 const GAS_WEB_APP_URL = "https://script.google.com/a/macros/hjs.ed.jp/s/AKfycbxq7__DQzX4ci12QfJVhdmWMmAFzCa320LhOSOgl62e5q0idB9U5JJgwSURxRgNBgQk/exec";
 
-// デモモード用モックデータ（高校数学の代表的な基本問題）
-// 綺麗な数式SVG画像をインライン生成して使用します
-const DEMO_QUESTION = {
-  questionId: "math-demo-001",
-  questionTitle: "問題 1",
-  // SVG形式の綺麗な数式画像（外部画像URLがなくても確実に表示されます）
-  imageUrl: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="240" viewBox="0 0 600 240">
-    <rect width="100%" height="100%" fill="%23ffffff" rx="12"/>
-    <rect x="2" y="2" width="596" height="236" fill="none" stroke="%23e2e8f0" stroke-width="2" rx="10"/>
-    <text x="30" y="55" font-family="-apple-system, sans-serif" font-size="20" font-weight="bold" fill="%231e293b">【2次関数の頂点】</text>
-    <text x="30" y="105" font-family="-apple-system, sans-serif" font-size="22" fill="%23334155">次の2次関数のグラフの頂点の座標を求めよ。</text>
-    <rect x="50" y="130" width="500" height="75" fill="%23f8fafc" stroke="%23cbd5e1" stroke-width="1.5" rx="8"/>
-    <text x="300" y="178" font-family="Cambria Math, Times New Roman, serif" font-size="34" font-weight="bold" font-style="italic" fill="%231d4ed8" text-anchor="middle">y = 2(x - 3)² + 4</text>
-  </svg>`,
-  choices: [
-    "( 3 ,  4 )",
-    "( -3 ,  4 )",
-    "( 3 , -4 )",
-    "( -3 , -4 )"
-  ],
-  correctAnswer: "( 3 ,  4 )"
+// デモモード用モックデータ
+const DEMO_QUESTIONS_LIST = [
+  { questionId: "demo-001", round: "第1回", title: "2次関数の頂点", type: "4択" },
+  { questionId: "demo-002", round: "第2回", title: "判別式とグラフの共有点", type: "4択" }
+];
+
+const DEMO_QUESTION_DETAIL = {
+  "demo-001": {
+    questionId: "demo-001",
+    round: "第1回",
+    questionTitle: "第1回 2次関数の頂点",
+    type: "4択",
+    imageUrl: `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="600" height="240" viewBox="0 0 600 240">
+      <rect width="100%" height="100%" fill="%23ffffff" rx="12"/>
+      <rect x="2" y="2" width="596" height="236" fill="none" stroke="%23e2e8f0" stroke-width="2" rx="10"/>
+      <text x="30" y="55" font-family="-apple-system, sans-serif" font-size="20" font-weight="bold" fill="%231e293b">【2次関数の頂点】</text>
+      <text x="30" y="105" font-family="-apple-system, sans-serif" font-size="22" fill="%23334155">次の2次関数のグラフの頂点の座標を求めよ。</text>
+      <rect x="50" y="130" width="500" height="75" fill="%23f8fafc" stroke="%23cbd5e1" stroke-width="1.5" rx="8"/>
+      <text x="300" y="178" font-family="Cambria Math, Times New Roman, serif" font-size="34" font-weight="bold" font-style="italic" fill="%231d4ed8" text-anchor="middle">y = 2(x - 3)² + 4</text>
+    </svg>`,
+    choices: ["( 3 ,  4 )", "( -3 ,  4 )", "( 3 , -4 )", "( -3 , -4 )"],
+    correctAnswer: "( 3 ,  4 )"
+  },
+  "demo-002": {
+    questionId: "demo-002",
+    round: "第2回",
+    questionTitle: "第2回 判別式とグラフの共有点",
+    type: "4択",
+    imageUrl: "",
+    choices: ["D > 0", "D = 0", "D < 0", "判定不能"],
+    correctAnswer: "D > 0"
+  }
 };
 
 // ==========================================
 // 2. DOM要素の取得
 // ==========================================
 const screens = {
+  list: document.getElementById("listScreen"),
   loading: document.getElementById("loadingScreen"),
   question: document.getElementById("questionScreen"),
   result: document.getElementById("resultScreen"),
   error: document.getElementById("errorScreen")
 };
+
+const loadingMessageEl = document.getElementById("loadingMessage");
+const quizListContainerEl = document.getElementById("quizListContainer");
+
+const backToListFromQuestionBtnEl = document.getElementById("backToListFromQuestionBtn");
+const backToListFromResultBtnEl = document.getElementById("backToListFromResultBtn");
 
 const questionNumberEl = document.getElementById("questionNumber");
 const questionImageEl = document.getElementById("questionImage");
@@ -60,7 +76,7 @@ const reloadBtnEl = document.getElementById("reloadBtn");
 const errorMessageEl = document.getElementById("errorMessage");
 const demoNoticeEl = document.getElementById("demoNotice");
 
-// アプリ内部の状態管理
+// アプリ内部の状態
 let currentQuestion = null;
 
 // ==========================================
@@ -81,26 +97,23 @@ function switchScreen(targetScreenName) {
 // ==========================================
 
 /**
- * 1. 問題データの取得（GETリクエスト）
+ * 0. 小テスト一覧の取得
  */
-async function fetchQuestion() {
+async function fetchQuestionList() {
+  loadingMessageEl.textContent = "小テスト一覧を読み込んでいます...";
   switchScreen("loading");
 
-  // GASのURLが未設定の場合はデモモードで動作
+  // デモモード判定
   if (!GAS_WEB_APP_URL || GAS_WEB_APP_URL.trim() === "") {
-    console.log("【デモモード】モック問題データを読み込みます。");
     demoNoticeEl.classList.remove("hidden");
-    // 少し待機時間を設けてローディング演出を確認できるようにする
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    currentQuestion = DEMO_QUESTION;
-    renderQuestion(currentQuestion);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+    renderQuestionList(DEMO_QUESTIONS_LIST);
     return;
   }
 
-  // GASへ実際にリクエスト
   demoNoticeEl.classList.add("hidden");
   try {
-    const response = await fetch(`${GAS_WEB_APP_URL}?action=getQuestion`, {
+    const response = await fetch(`${GAS_WEB_APP_URL}?action=getQuestionList`, {
       method: "GET",
       redirect: "follow"
     });
@@ -110,11 +123,56 @@ async function fetchQuestion() {
     }
 
     const data = await response.json();
+    if (data.error) {
+      throw new Error(data.error);
+    }
+
+    renderQuestionList(data.questions || []);
+  } catch (error) {
+    console.error("一覧取得エラー:", error);
+    errorMessageEl.textContent = `小テスト一覧の取得に失敗しました: ${error.message}`;
+    switchScreen("error");
+  }
+}
+
+/**
+ * 1. 特定の問題データの取得（GETリクエスト）
+ */
+async function fetchQuestion(questionId = null) {
+  loadingMessageEl.textContent = "問題を読み込んでいます...";
+  switchScreen("loading");
+
+  // デモモード判定
+  if (!GAS_WEB_APP_URL || GAS_WEB_APP_URL.trim() === "") {
+    demoNoticeEl.classList.remove("hidden");
+    await new Promise((resolve) => setTimeout(resolve, 600));
+    currentQuestion = DEMO_QUESTION_DETAIL[questionId] || DEMO_QUESTION_DETAIL["demo-001"];
+    renderQuestion(currentQuestion);
+    return;
+  }
+
+  demoNoticeEl.classList.add("hidden");
+  try {
+    const query = questionId ? `&questionId=${encodeURIComponent(questionId)}` : "";
+    const response = await fetch(`${GAS_WEB_APP_URL}?action=getQuestion${query}`, {
+      method: "GET",
+      redirect: "follow"
+    });
+
+    if (!response.ok) {
+      throw new Error(`サーバーエラー (ステータス: ${response.status})`);
+    }
+
+    const data = await response.json();
+    if (data.error) {
+      throw new Error(data.error);
+    }
+
     currentQuestion = data;
     renderQuestion(data);
   } catch (error) {
     console.error("問題取得エラー:", error);
-    errorMessageEl.textContent = `通信エラーが発生しました: ${error.message}`;
+    errorMessageEl.textContent = `問題の読み込みに失敗しました: ${error.message}`;
     switchScreen("error");
   }
 }
@@ -130,13 +188,11 @@ async function submitAnswer(selectedChoice) {
 
   // デモモード判定
   if (!GAS_WEB_APP_URL || GAS_WEB_APP_URL.trim() === "") {
-    console.log("【デモモード】解答を判定します:", selectedChoice);
     await new Promise((resolve) => setTimeout(resolve, 600));
-
-    const isCorrect = (selectedChoice === DEMO_QUESTION.correctAnswer);
+    const isCorrect = (selectedChoice === currentQuestion.correctAnswer);
     renderResult({
       isCorrect: isCorrect,
-      correctAnswer: DEMO_QUESTION.correctAnswer
+      correctAnswer: currentQuestion.correctAnswer
     });
     return;
   }
@@ -149,8 +205,6 @@ async function submitAnswer(selectedChoice) {
       answer: selectedChoice
     };
 
-    // Google Apps ScriptのWebアプリPOSTはCORSプリフライトを避けるため
-    // Content-Typeを text/plain にし、リダイレクト追従を行います
     const response = await fetch(GAS_WEB_APP_URL, {
       method: "POST",
       headers: {
@@ -165,11 +219,14 @@ async function submitAnswer(selectedChoice) {
     }
 
     const result = await response.json();
+    if (result.error) {
+      throw new Error(result.error);
+    }
+
     renderResult(result);
   } catch (error) {
     console.error("解答送信エラー:", error);
     alert(`解答の送信中にエラーが発生しました。\nもう一度お試しください: ${error.message}`);
-    // ボタンを再度有効化
     submittingOverlayEl.classList.add("hidden");
     buttons.forEach(btn => btn.disabled = false);
   }
@@ -180,17 +237,60 @@ async function submitAnswer(selectedChoice) {
 // ==========================================
 
 /**
+ * 小テスト一覧画面の描画
+ */
+function renderQuestionList(questions) {
+  quizListContainerEl.innerHTML = "";
+
+  if (!questions || questions.length === 0) {
+    quizListContainerEl.innerHTML = `
+      <div style="text-align: center; padding: 40px 20px; color: #64748b;">
+        <p style="font-size: 1.1rem; font-weight: 600;">現在、公開中の小テストはありません。</p>
+        <p style="font-size: 0.9rem; margin-top: 8px;">先生がスプレッドシートで「公開」に設定するのをお待ちください。</p>
+      </div>
+    `;
+    switchScreen("list");
+    return;
+  }
+
+  questions.forEach((q) => {
+    const card = document.createElement("div");
+    card.className = "quiz-card";
+
+    card.innerHTML = `
+      <div class="quiz-card-info">
+        <span class="round-badge">${escapeHtml(q.round || "小テスト")}</span>
+        <span class="quiz-card-title">${escapeHtml(q.title || "無題のテスト")}</span>
+        <span class="quiz-card-type">${escapeHtml(q.type || "4択")}</span>
+      </div>
+      <div class="quiz-card-action">
+        <span>挑戦する</span>
+        <span>➔</span>
+      </div>
+    `;
+
+    card.addEventListener("click", () => {
+      fetchQuestion(q.questionId);
+    });
+
+    quizListContainerEl.appendChild(card);
+  });
+
+  switchScreen("list");
+}
+
+/**
  * 出題画面の描画
  */
 function renderQuestion(questionData) {
-  // 問題番号
-  questionNumberEl.textContent = questionData.questionTitle || `問題 (${questionData.questionId || 1})`;
+  // 問題タイトル・回数
+  questionNumberEl.textContent = questionData.questionTitle || questionData.round || "小テスト";
 
-  // 画像のロード待機処理
+  // 画像の表示処理
   if (!questionData.imageUrl || questionData.imageUrl.trim() === "") {
-    // 画像URLがまだ登録されていない場合の案内表示
+    // 画像URLが設定されていない場合
     imageLoaderEl.style.display = "flex";
-    imageLoaderEl.innerHTML = `<span style="color:#64748b; font-size:1rem; font-weight:500;">📝 （問題画像は未設定です。プリント等を参照するか、Googleドライブの画像URLを設定してください）</span>`;
+    imageLoaderEl.innerHTML = `<span style="color:#64748b; font-size:1rem; font-weight:500;">📝 （問題画像は未設定です。プリント等を確認するか、先生の指示に従ってください）</span>`;
     questionImageEl.style.display = "none";
   } else {
     questionImageEl.style.display = "block";
@@ -203,7 +303,7 @@ function renderQuestion(questionData) {
       questionImageEl.style.opacity = "1";
     };
     questionImageEl.onerror = () => {
-      imageLoaderEl.innerHTML = `<span style="color:#ef4444;">画像の読み込みに失敗しました（権限またはURLを確認してください）</span>`;
+      imageLoaderEl.innerHTML = `<span style="color:#ef4444;">画像の読み込みに失敗しました（Googleドライブの共有設定を確認してください）</span>`;
     };
     questionImageEl.src = questionData.imageUrl;
   }
@@ -228,7 +328,7 @@ function renderQuestion(questionData) {
     btn.appendChild(labelSpan);
     btn.appendChild(textSpan);
 
-    // クリック時に即座送信（確認ダイアログなし）
+    // クリック時に即座送信
     btn.addEventListener("click", () => {
       btn.classList.add("selected");
       submitAnswer(choiceText);
@@ -242,7 +342,7 @@ function renderQuestion(questionData) {
 }
 
 /**
- * 結果画面の描画と演出の起動
+ * 結果画面の描画と演出
  */
 function renderResult(result) {
   submittingOverlayEl.classList.add("hidden");
@@ -251,29 +351,32 @@ function renderResult(result) {
   const isCorrect = result.isCorrect;
   correctAnswerTextEl.textContent = result.correctAnswer || "";
 
-  // 以前のアニメーションクラスをリセット
   resultCardEl.classList.remove("shake");
 
   if (isCorrect) {
-    // 【正解の場合】
     resultIconEl.textContent = "🎉";
     resultTitleEl.textContent = "正解！お見事！";
     resultTitleEl.className = "result-title correct";
     resultMessageEl.textContent = "バッチリ理解できています！本日の授業もこの調子でいきましょう！";
-
-    // 物理演算風の紙吹雪エフェクトを盛大に発射！
     fireConfettiExplosion();
   } else {
-    // 【不正解の場合】
     resultIconEl.textContent = "💪";
     resultTitleEl.textContent = "惜しい！不正解…";
     resultTitleEl.className = "result-title incorrect";
     resultMessageEl.textContent = "間違えたところは絶好の学びのチャンス！授業内の解説をしっかり確認しましょう。";
-
-    // シェイク（揺れ）と励ましパーティクル
     resultCardEl.classList.add("shake");
     fireRippleEffect();
   }
+}
+
+// XSS防止用エスケープ
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 }
 
 // ==========================================
@@ -292,7 +395,6 @@ function resizeCanvas() {
 window.addEventListener("resize", resizeCanvas);
 resizeCanvas();
 
-// パーティクルクラス（重力・空気抵抗・回転の物理計算）
 class Particle {
   constructor(x, y, color, type = "confetti") {
     this.x = x;
@@ -300,14 +402,13 @@ class Particle {
     this.color = color;
     this.type = type;
 
-    // 速度と方向（四方八方に爆発的に散る）
     const angle = Math.random() * Math.PI * 2;
     const speed = (Math.random() * 12 + 6);
     this.vx = Math.cos(angle) * speed;
-    this.vy = Math.sin(angle) * speed - (type === "confetti" ? 6 : 2); // 初速で上にも跳ねる
+    this.vy = Math.sin(angle) * speed - (type === "confetti" ? 6 : 2);
 
-    this.gravity = 0.28;       // 重力
-    this.friction = 0.985;     // 空気抵抗
+    this.gravity = 0.28;
+    this.friction = 0.985;
 
     this.size = Math.random() * 8 + 6;
     this.rotation = Math.random() * 360;
@@ -339,10 +440,8 @@ class Particle {
 
     context.fillStyle = this.color;
     if (this.type === "confetti") {
-      // 四角い紙吹雪
       context.fillRect(-this.size / 2, -this.size / 4, this.size, this.size / 2);
     } else {
-      // まるい星・しずく
       context.beginPath();
       context.arc(0, 0, this.size / 2, 0, Math.PI * 2);
       context.fill();
@@ -373,13 +472,11 @@ function runParticleLoop() {
   }
 }
 
-// 正解時の紙吹雪大爆発
 function fireConfettiExplosion() {
   const colors = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4"];
   const centerX = window.innerWidth / 2;
   const centerY = window.innerHeight / 2 - 50;
 
-  // 120個の紙吹雪を生成
   for (let i = 0; i < 120; i++) {
     const color = colors[Math.floor(Math.random() * colors.length)];
     particles.push(new Particle(centerX, centerY, color, "confetti"));
@@ -390,7 +487,6 @@ function fireConfettiExplosion() {
   }
 }
 
-// 不正解時のエフェクト（青・水色の星がポンと弾ける）
 function fireRippleEffect() {
   const colors = ["#60a5fa", "#93c5fd", "#cbd5e1"];
   const centerX = window.innerWidth / 2;
@@ -409,15 +505,34 @@ function fireRippleEffect() {
 // ==========================================
 // 7. イベントリスナー登録 & 初期起動
 // ==========================================
+backToListFromQuestionBtnEl.addEventListener("click", () => {
+  fetchQuestionList();
+});
+
+backToListFromResultBtnEl.addEventListener("click", () => {
+  fetchQuestionList();
+});
+
 retryBtnEl.addEventListener("click", () => {
-  fetchQuestion();
+  if (currentQuestion) {
+    fetchQuestion(currentQuestion.questionId);
+  } else {
+    fetchQuestionList();
+  }
 });
 
 reloadBtnEl.addEventListener("click", () => {
-  fetchQuestion();
+  fetchQuestionList();
 });
 
-// アプリ開始
+// アプリ開始：URLパラメータに ?q=xxx があればその問題を直撃、なければ一覧を表示
 window.addEventListener("DOMContentLoaded", () => {
-  fetchQuestion();
+  const urlParams = new URLSearchParams(window.location.search);
+  const directQuestionId = urlParams.get("q");
+
+  if (directQuestionId) {
+    fetchQuestion(directQuestionId);
+  } else {
+    fetchQuestionList();
+  }
 });

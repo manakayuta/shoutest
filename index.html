@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>数学 復習テスト</title>
+  <title>数学小テストシステム</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -17,16 +17,30 @@
     </header>
 
     <main class="main-card">
+      <!-- 0. 小テスト一覧画面 -->
+      <section id="listScreen" class="screen">
+        <div class="list-header">
+          <h2 class="list-title">小テスト一覧</h2>
+          <p class="list-subtitle">受ける小テストを選んでください（過去の復習も可能です）</p>
+        </div>
+        <div id="quizListContainer" class="quiz-list-container">
+          <!-- JSでテストカード一覧を動的生成 -->
+        </div>
+      </section>
+
       <!-- 1. ローディング画面 -->
       <section id="loadingScreen" class="screen active">
         <div class="spinner-wrapper">
           <div class="spinner"></div>
-          <p class="loading-text">本日の問題を読み込んでいます...</p>
+          <p id="loadingMessage" class="loading-text">データを読み込んでいます...</p>
         </div>
       </section>
 
       <!-- 2. 出題画面 -->
       <section id="questionScreen" class="screen">
+        <div class="question-top-bar">
+          <button id="backToListFromQuestionBtn" class="back-link-btn" type="button">← テスト一覧に戻る</button>
+        </div>
         <div class="question-header">
           <span class="question-number" id="questionNumber">問題</span>
           <span class="instruction">正しい選択肢を1つ選んでください</span>
@@ -73,8 +87,10 @@
             <p class="sub-text">画面をそのままにして先生の指示を待ってください。</p>
           </div>
 
-          <!-- デモ・確認用（開発時にリセットして再度試すボタン） -->
-          <button id="retryBtn" class="retry-btn">もう一度解き直す（テスト用）</button>
+          <div class="result-actions">
+            <button id="backToListFromResultBtn" class="primary-btn">小テスト一覧に戻る</button>
+            <button id="retryBtn" class="retry-btn">この問題をもう一度解く</button>
+          </div>
         </div>
       </section>
 
