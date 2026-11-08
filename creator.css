@@ -224,6 +224,11 @@ body {
   height: 100%;
   opacity: 0;
   cursor: pointer;
+  z-index: 2;
+}
+
+.drop-zone-content {
+  pointer-events: none; /* テキストやアイコンがクリック・ドラッグを邪魔しないようにする */
 }
 
 .drop-icon {
@@ -245,6 +250,7 @@ body {
 
 .image-preview-wrapper {
   position: relative;
+  z-index: 5;
   max-height: 220px;
   display: flex;
   justify-content: center;
@@ -264,6 +270,7 @@ body {
   position: absolute;
   top: 6px;
   right: 6px;
+  z-index: 10;
   background-color: rgba(15, 23, 42, 0.75);
   color: white;
   border: none;

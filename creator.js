@@ -50,134 +50,261 @@ const copySuccessMessage = document.getElementById("copySuccessMessage");
 let currentImageBase64 = null;
 let currentGeneratedData = null;
 
+// 安全なストレージ操作ラッパー（GAS iframeやプライベートモードでの例外を防止）
+const safeStorage = {
+  get(key) {
+    try {
+      return localStorage.getItem(key);
+    } catch (e) {
+      console.warn("localStorage get error:", e);
+      return null;
+    }
+  },
+  set(key, val) {
+    try {
+      localStorage.setItem(key, val);
+    } catch (e) {
+      console.warn("localStorage set error:", e);
+    }
+  },
+  remove(key) {
+    try {
+      localStorage.removeItem(key);
+    } catch (e) {
+      console.warn("localStorage remove error:", e);
+    }
+  }
+};
+
 // ==========================================
 // 1. 初期ロード & 設定の復元（自動記憶）
 // ==========================================
-window.addEventListener("DOMContentLoaded", () => {
+function initSettings() {
   // APIキーの復元
-  const savedApiKey = localStorage.getItem(STORAGE_KEY_API);
-  if (savedApiKey) {
+  const savedApiKey = safeStorage.get(STORAGE_KEY_API);
+  if (savedApiKey && apiKeyInput) {
     apiKeyInput.value = savedApiKey;
-    apiSavedNotice.style.display = "inline-block";
-  } else {
+    if (apiSavedNotice) apiSavedNotice.style.display = "inline-block";
+  } else if (apiSavedNotice) {
     apiSavedNotice.style.display = "none";
   }
 
   // フォルダURLの復元
-  const savedFolderUrl = localStorage.getItem(STORAGE_KEY_FOLDER);
-  if (savedFolderUrl) {
+  const savedFolderUrl = safeStorage.get(STORAGE_KEY_FOLDER);
+  if (savedFolderUrl && driveFolderUrlInput) {
     driveFolderUrlInput.value = savedFolderUrl;
-    folderSavedNotice.style.display = "inline-block";
-  } else {
+    if (folderSavedNotice) folderSavedNotice.style.display = "inline-block";
+  } else if (folderSavedNotice) {
     folderSavedNotice.style.display = "none";
   }
 
   checkReadyToGenerate();
-});
+}
+
+// DOM読み込み完了時に初期化（GAS等のiframe環境でも確実に実行）
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initSettings);
+} else {
+  initSettings();
+}
 
 // APIキーの入力時即座自動保存
-apiKeyInput.addEventListener("input", () => {
-  const key = apiKeyInput.value.trim();
-  if (key) {
-    localStorage.setItem(STORAGE_KEY_API, key);
-    apiSavedNotice.style.display = "inline-block";
-  } else {
-    localStorage.removeItem(STORAGE_KEY_API);
-    apiSavedNotice.style.display = "none";
-  }
-  checkReadyToGenerate();
-});
+if (apiKeyInput) {
+  apiKeyInput.addEventListener("input", () => {
+    const key = apiKeyInput.value.trim();
+    if (key) {
+      safeStorage.set(STORAGE_KEY_API, key);
+      if (apiSavedNotice) apiSavedNotice.style.display = "inline-block";
+    } else {
+      safeStorage.remove(STORAGE_KEY_API);
+      if (apiSavedNotice) apiSavedNotice.style.display = "none";
+    }
+    checkReadyToGenerate();
+  });
+}
 
-toggleApiVisibilityBtn.addEventListener("click", () => {
-  if (apiKeyInput.type === "password") {
-    apiKeyInput.type = "text";
-    toggleApiVisibilityBtn.textContent = "🙈";
-  } else {
-    apiKeyInput.type = "password";
-    toggleApiVisibilityBtn.textContent = "👁️";
-  }
-});
+if (toggleApiVisibilityBtn && apiKeyInput) {
+  toggleApiVisibilityBtn.addEventListener("click", () => {
+    if (apiKeyInput.type === "password") {
+      apiKeyInput.type = "text";
+      toggleApiVisibilityBtn.textContent = "🙈";
+    } else {
+      apiKeyInput.type = "password";
+      toggleApiVisibilityBtn.textContent = "👁️";
+    }
+  });
+}
 
 // フォルダURLの入力時即座自動保存
-driveFolderUrlInput.addEventListener("input", () => {
-  const url = driveFolderUrlInput.value.trim();
-  if (url) {
-    localStorage.setItem(STORAGE_KEY_FOLDER, url);
-    folderSavedNotice.style.display = "inline-block";
-  } else {
-    localStorage.removeItem(STORAGE_KEY_FOLDER);
-    folderSavedNotice.style.display = "none";
-  }
-});
+if (driveFolderUrlInput) {
+  driveFolderUrlInput.addEventListener("input", () => {
+    const url = driveFolderUrlInput.value.trim();
+    if (url) {
+      safeStorage.set(STORAGE_KEY_FOLDER, url);
+      if (folderSavedNotice) folderSavedNotice.style.display = "inline-block";
+    } else {
+      safeStorage.remove(STORAGE_KEY_FOLDER);
+      if (folderSavedNotice) folderSavedNotice.style.display = "none";
+    }
+  });
+}
 
 // ==========================================
-// 2. 画像の取り込み（ファイル・D&D・Ctrl+V）
+// 2. 画像の取り込み（ファイル選択・D&D・Ctrl+V）
 // ==========================================
 function handleImageFile(file) {
-  if (!file || !file.type.startsWith("image/")) {
-    alert("画像ファイルを選択してください。");
+  if (!file) return;
+
+  // 画像判定（MIMEタイプ、拡張子、またはBlobサイズ）
+  const isImage = (file.type && file.type.startsWith("image/")) ||
+                  /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(file.name || "") ||
+                  (file.size > 0 && (!file.type || file.type === "image"));
+
+  if (!isImage) {
+    alert("画像ファイル（PNG, JPEG 等）を選択してください。");
     return;
   }
 
   const reader = new FileReader();
   reader.onload = (e) => {
     currentImageBase64 = e.target.result;
-    sourceImagePreview.src = currentImageBase64;
-    dropZoneContent.classList.add("hidden");
-    sourceImagePreviewWrapper.classList.remove("hidden");
+    if (sourceImagePreview) sourceImagePreview.src = currentImageBase64;
+    if (dropZoneContent) dropZoneContent.classList.add("hidden");
+    if (sourceImagePreviewWrapper) sourceImagePreviewWrapper.classList.remove("hidden");
     checkReadyToGenerate();
+  };
+  reader.onerror = () => {
+    alert("画像の読み込みに失敗しました。もう一度お試しください。");
   };
   reader.readAsDataURL(file);
 }
 
-fileInput.addEventListener("change", (e) => {
-  if (e.target.files && e.target.files[0]) {
-    handleImageFile(e.target.files[0]);
-  }
+// input type="file" のチェンジイベント
+if (fileInput) {
+  fileInput.addEventListener("change", (e) => {
+    if (e.target.files && e.target.files[0]) {
+      handleImageFile(e.target.files[0]);
+    }
+  });
+
+  // ファイル選択ダイアログを毎回確実に反応させる
+  fileInput.addEventListener("click", (e) => {
+    e.stopPropagation();
+    fileInput.value = "";
+  });
+}
+
+// ドロップゾーン全体のクリックで確実にファイル選択ダイアログを起動
+if (dropZone) {
+  dropZone.addEventListener("click", (e) => {
+    if (e.target !== fileInput && e.target.id !== "clearImgBtn" && !e.target.closest("#clearImgBtn")) {
+      if (fileInput) fileInput.click();
+    }
+  });
+}
+
+// ウィンドウ全体でのドラッグ＆ドロップによるページ遷移防止
+["dragenter", "dragover", "dragleave", "drop"].forEach((eventName) => {
+  window.addEventListener(eventName, (e) => {
+    e.preventDefault();
+  }, false);
 });
 
 // ドラッグ＆ドロップ
-dropZone.addEventListener("dragover", (e) => {
-  e.preventDefault();
-  dropZone.classList.add("drag-over");
-});
-dropZone.addEventListener("dragleave", () => {
-  dropZone.classList.remove("drag-over");
-});
-dropZone.addEventListener("drop", (e) => {
-  e.preventDefault();
-  dropZone.classList.remove("drag-over");
-  if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-    handleImageFile(e.dataTransfer.files[0]);
-  }
-});
+if (dropZone) {
+  dropZone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dropZone.classList.add("drag-over");
+  });
+
+  dropZone.addEventListener("dragleave", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dropZone.classList.remove("drag-over");
+  });
+
+  dropZone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dropZone.classList.remove("drag-over");
+
+    const files = e.dataTransfer?.files;
+    if (files && files.length > 0) {
+      handleImageFile(files[0]);
+      return;
+    }
+
+    const items = e.dataTransfer?.items;
+    if (items && items.length > 0) {
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].kind === "file") {
+          const f = items[i].getAsFile();
+          if (f) {
+            handleImageFile(f);
+            return;
+          }
+        }
+      }
+    }
+  });
+}
 
 // Ctrl + V（クリップボード貼り付け）
-window.addEventListener("paste", (e) => {
-  const items = (e.clipboardData || e.originalEvent.clipboardData).items;
-  for (let i = 0; i < items.length; i++) {
-    if (items[i].type.indexOf("image") !== -1) {
-      const blob = items[i].getAsFile();
-      handleImageFile(blob);
-      break;
+function handlePaste(e) {
+  const clipboardData = e.clipboardData || window.clipboardData;
+  if (!clipboardData) return;
+
+  // 1. filesから探す (ファイルコピー対応)
+  const files = clipboardData.files;
+  if (files && files.length > 0) {
+    for (let i = 0; i < files.length; i++) {
+      const f = files[i];
+      if ((f.type && f.type.startsWith("image/")) || /\.(png|jpe?g|gif|webp|bmp)$/i.test(f.name || "")) {
+        e.preventDefault();
+        handleImageFile(f);
+        return;
+      }
     }
   }
-});
 
-clearImgBtn.addEventListener("click", (e) => {
-  e.stopPropagation();
-  currentImageBase64 = null;
-  fileInput.value = "";
-  sourceImagePreview.src = "";
-  sourceImagePreviewWrapper.classList.add("hidden");
-  dropZoneContent.classList.remove("hidden");
-  checkReadyToGenerate();
-});
+  // 2. itemsから探す (画面切り取り・スクショ貼り付け対応)
+  const items = clipboardData.items;
+  if (items && items.length > 0) {
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item.type && item.type.indexOf("image") !== -1) {
+        const blob = item.getAsFile();
+        if (blob) {
+          e.preventDefault();
+          handleImageFile(blob);
+          return;
+        }
+      }
+    }
+  }
+}
+
+window.addEventListener("paste", handlePaste);
+document.addEventListener("paste", handlePaste);
+
+if (clearImgBtn) {
+  clearImgBtn.addEventListener("click", (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    currentImageBase64 = null;
+    if (fileInput) fileInput.value = "";
+    if (sourceImagePreview) sourceImagePreview.src = "";
+    if (sourceImagePreviewWrapper) sourceImagePreviewWrapper.classList.add("hidden");
+    if (dropZoneContent) dropZoneContent.classList.remove("hidden");
+    checkReadyToGenerate();
+  });
+}
 
 function checkReadyToGenerate() {
-  const hasKey = apiKeyInput.value.trim().length > 0;
+  const hasKey = apiKeyInput ? apiKeyInput.value.trim().length > 0 : false;
   const hasImage = currentImageBase64 !== null;
-  generateBtn.disabled = !(hasKey && hasImage);
+  if (generateBtn) generateBtn.disabled = !(hasKey && hasImage);
 }
 
 // ==========================================
