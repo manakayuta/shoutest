@@ -310,7 +310,7 @@ function renderQuestion(questionData) {
 
   // 選択肢ボタンの動的生成
   choicesContainerEl.innerHTML = "";
-  const choiceLabels = ["A", "B", "C", "D"];
+  const choiceLabels = ["A", "B", "C", "D", "E", "F"];
 
   questionData.choices.forEach((choiceText, index) => {
     const btn = document.createElement("button");

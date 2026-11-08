@@ -1,6 +1,6 @@
 /**
  * ========================================================
- * 数学小テストシステム 完全自動・なりすまし防止版 (コード.gs)
+ * 数学小テストシステム 最大6択対応版 (コード.gs)
  * ========================================================
  */
 
@@ -12,7 +12,7 @@ function doGet(e) {
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
-// 2. 問題一覧の取得（サーバー側処理）
+// 2. 問題一覧の取得
 function getQuestionListServer() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("問題一覧");
@@ -23,7 +23,7 @@ function getQuestionListServer() {
 
   const rows = data.slice(1);
   return rows
-    .filter(r => r[10] === "公開") // K列が「公開」
+    .filter(r => String(r[12]).trim() === "公開") // M列(インデックス12)が「公開」
     .map(r => ({
       questionId: String(r[0]),
       round: String(r[1]),
@@ -32,7 +32,7 @@ function getQuestionListServer() {
     }));
 }
 
-// 3. 個別問題データの取得（サーバー側処理）
+// 3. 個別問題データの取得（最大6択まで対応）
 function getQuestionServer(questionId) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("問題一覧");
@@ -42,9 +42,9 @@ function getQuestionServer(questionId) {
   let targetRow = null;
 
   if (questionId) {
-    targetRow = rows.find(r => String(r[0]) === String(questionId) && r[10] === "公開");
+    targetRow = rows.find(r => String(r[0]) === String(questionId) && String(r[12]).trim() === "公開");
   } else {
-    targetRow = rows.find(r => r[10] === "公開");
+    targetRow = rows.find(r => String(r[12]).trim() === "公開");
   }
 
   if (!targetRow) throw new Error("出題可能な問題が見つかりません");
@@ -52,11 +52,14 @@ function getQuestionServer(questionId) {
   const rawImageUrl = String(targetRow[4] || "");
   const directImageUrl = convertDriveUrlToDirect(rawImageUrl);
 
+  // F列(5)〜K列(10)の最大6択を取得し、空欄でないものだけを抽出
   const choices = [
-    String(targetRow[5] || ""),
-    String(targetRow[6] || ""),
-    String(targetRow[7] || ""),
-    String(targetRow[8] || "")
+    String(targetRow[5] || ""),  // 選択肢A
+    String(targetRow[6] || ""),  // 選択肢B
+    String(targetRow[7] || ""),  // 選択肢C
+    String(targetRow[8] || ""),  // 選択肢D
+    String(targetRow[9] || ""),  // 選択肢E
+    String(targetRow[10] || "")  // 選択肢F
   ].filter(c => c.trim() !== "");
 
   return {
@@ -65,11 +68,11 @@ function getQuestionServer(questionId) {
     questionTitle: `${targetRow[1]} ${targetRow[2]}`,
     type: String(targetRow[3]),
     imageUrl: directImageUrl,
-    choices: choices.length > 0 ? choices : ["A", "B", "C", "D"]
+    choices: choices.length > 0 ? choices : ["A", "B"]
   };
 }
 
-// 4. 解答の送信と成績記録（サーバー側処理）
+// 4. 解答の送信と成績記録
 function submitAnswerServer(questionId, selectedChoice) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const qSheet = ss.getSheetByName("問題一覧");
@@ -81,11 +84,12 @@ function submitAnswerServer(questionId, selectedChoice) {
   const targetQ = qRows.find(r => String(r[0]) === String(questionId));
   if (!targetQ) throw new Error("該当の問題が見つかりません");
 
-  const correctAnswer = String(targetQ[9]).trim();
+  // L列(インデックス11)が「正解」
+  const correctAnswer = String(targetQ[11]).trim();
   const studentAnswer = String(selectedChoice).trim();
   const isCorrect = (studentAnswer.toUpperCase() === correctAnswer.toUpperCase());
 
-  // ★ここで生徒本人の本物の学校メールアドレスを100%自動取得（なりすまし不可）
+  // 生徒の学校メールアドレス
   let studentEmail = Session.getActiveUser().getEmail();
   if (!studentEmail) {
     studentEmail = "未取得アカウント";
@@ -111,7 +115,7 @@ function submitAnswerServer(questionId, selectedChoice) {
   };
 }
 
-// ユーティリティ: Googleドライブ共有リンクをWeb画像URLに変換
+// Googleドライブ画像URLの自動変換
 function convertDriveUrlToDirect(url) {
   if (!url) return "";
   if (url.includes("lh3.googleusercontent.com") || url.startsWith("data:")) return url;
