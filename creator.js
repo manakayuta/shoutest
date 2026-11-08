@@ -1,7 +1,7 @@
 // ========================================================
-// 数学小テスト 問題作成スタジオ ロジック v3.4 (creator.js)
+// 数学小テスト 問題作成スタジオ ロジック v3.5 (creator.js)
 // GAS (HtmlService iframe) / ローカル両対応・完全版
-// 生徒用画面 (index.html) と同一の純粋ES構文・タイムアウト無制限版
+// 生徒用画面 (index.html) と同一の純粋ES構文・AIモデル動的自動検出＆タイムアウト無制限版
 // ========================================================
 
 const STORAGE_KEY_API = "quick_quiz_gemini_api_key";
@@ -96,7 +96,7 @@ function resetPasteBoxState() {
     box.classList.remove("paste-ready");
     box.setAttribute("data-placeholder", "💡 ここをクリックして Ctrl + V（または右クリック→貼り付け）");
   }
-  setPasteStatus("🟢 動作準備OK (v3.4) — ファイル選択 / D&D / Ctrl+V すべて対応", "ready");
+  setPasteStatus("🟢 動作準備OK (v3.5) — ファイル選択 / D&D / Ctrl+V すべて対応", "ready");
 }
 
 // ==========================================
@@ -379,8 +379,8 @@ function initCreatorApp() {
       manualCopyBtn.addEventListener("click", handleManualCopyClick);
     }
 
-    setVersionBadge("教員用ツール v3.4 (🟢 動作準備OK)", "badge-ready");
-    setPasteStatus("🟢 動作準備OK (v3.4) — ファイル選択 / D&D / Ctrl+V すべて対応", "ready");
+    setVersionBadge("教員用ツール v3.5 (🟢 動作準備OK)", "badge-ready");
+    setPasteStatus("🟢 動作準備OK (v3.5) — ファイル選択 / D&D / Ctrl+V すべて対応", "ready");
 
     // ブラウザの遅延自動入力（オートフィル）対策
     [300, 1000, 2500].forEach(function (delay) {
@@ -392,7 +392,7 @@ function initCreatorApp() {
   } catch (err) {
     const msg = err && err.message ? err.message : String(err);
     console.error("Creator init error:", err);
-    setVersionBadge("教員用ツール v3.4 (🔴 起動エラー: " + msg + ")", "badge-error");
+    setVersionBadge("教員用ツール v3.5 (🔴 起動エラー: " + msg + ")", "badge-error");
     setPasteStatus("🔴 起動エラー: " + msg, "error");
   }
 }
@@ -400,7 +400,7 @@ function initCreatorApp() {
 window.addEventListener("error", function (e) {
   if (!isAppInitialized) {
     const msg = (e && e.message) ? e.message : "不明なエラー";
-    setVersionBadge("教員用ツール v3.4 (🔴 エラー: " + msg + ")", "badge-error");
+    setVersionBadge("教員用ツール v3.5 (🔴 エラー: " + msg + ")", "badge-error");
     setPasteStatus("🔴 エラー: " + msg, "error");
   }
 });
@@ -850,7 +850,61 @@ function fetchDirect(url, options) {
   });
 }
 
-function callGeminiViaGasServer(apiKey, requestBody, token) {
+function extractGenerateModels(data) {
+  if (!data || !Array.isArray(data.models)) return [];
+  const list = [];
+  data.models.forEach(function (m) {
+    if (m && m.name && Array.isArray(m.supportedGenerationMethods)) {
+      if (m.supportedGenerationMethods.indexOf("generateContent") !== -1) {
+        let name = m.name;
+        if (name.indexOf("models/") === 0) name = name.substring(7);
+        list.push(name);
+      }
+    }
+  });
+  list.sort(function (a, b) {
+    const aFlash = a.indexOf("flash") !== -1 ? 1 : 0;
+    const bFlash = b.indexOf("flash") !== -1 ? 1 : 0;
+    if (aFlash !== bFlash) return bFlash - aFlash;
+    return b.localeCompare(a);
+  });
+  return list;
+}
+
+function fetchAvailableModels(apiKey) {
+  const url = "https://generativelanguage.googleapis.com/v1beta/models?key=" + encodeURIComponent(apiKey);
+  return fetchDirect(url, { method: "GET" })
+    .then(function (res) {
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      return res.json();
+    })
+    .then(function (data) {
+      const models = extractGenerateModels(data);
+      if (models.length > 0) return models;
+      throw new Error("有効なモデルが見つかりませんでした");
+    })
+    .catch(function () {
+      if (typeof google !== "undefined" && google.script && google.script.run) {
+        return new Promise(function (resolve) {
+          google.script.run
+            .withSuccessHandler(function (models) {
+              if (Array.isArray(models) && models.length > 0) {
+                resolve(models);
+              } else {
+                resolve([]);
+              }
+            })
+            .withFailureHandler(function () {
+              resolve([]);
+            })
+            .listModelsServer(apiKey);
+        });
+      }
+      return [];
+    });
+}
+
+function callGeminiViaGasServer(apiKey, requestBody, token, preferredModel) {
   if (typeof google === "undefined" || !google.script || !google.script.run) {
     return Promise.reject(new Error("GASサーバー環境ではありません"));
   }
@@ -872,25 +926,31 @@ function callGeminiViaGasServer(apiKey, requestBody, token) {
           }
           reject(wrapped);
         })
-        .generateQuizServer(apiKey, requestBody);
+        .generateQuizServer(apiKey, requestBody, preferredModel || "");
     } catch (err) {
       reject(err);
     }
   });
 }
 
-function callGeminiWithFallback(modelCandidates, idx, apiKey, requestBody, lastErrorMsg, token, statusEl) {
+function callGeminiWithFallback(modelCandidates, idx, apiKey, requestBody, lastErrorMsg, token, statusEl, attemptedErrors) {
   if (token !== activeGenerateToken) {
     return Promise.reject(new Error("CANCELLED"));
   }
+  if (!attemptedErrors) attemptedErrors = [];
+
   if (idx >= modelCandidates.length) {
-    return Promise.reject(new Error("Gemini API エラー: " + (lastErrorMsg || "利用可能なモデルが見つかりませんでした。")));
+    let summary = lastErrorMsg || "利用可能なAIモデルが見つかりませんでした。";
+    if (attemptedErrors.length > 0) {
+      summary = summary + "（試行したモデル: " + attemptedErrors.join("; ") + "）";
+    }
+    return Promise.reject(new Error("Gemini API エラー: " + summary));
   }
 
   const model = modelCandidates[idx];
   const apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(apiKey);
   if (statusEl) {
-    statusEl.textContent = "AI (" + model + ") が画像を解析・改題中...（数分かかる場合があります）";
+    statusEl.textContent = "AI (" + model + ") が問題を生成中...（" + (idx + 1) + "/" + modelCandidates.length + "）";
   }
 
   return fetchDirect(apiUrl, {
@@ -913,7 +973,8 @@ function callGeminiWithFallback(modelCandidates, idx, apiKey, requestBody, lastE
         fatal.isFatalApiError = true;
         throw fatal;
       }
-      return callGeminiWithFallback(modelCandidates, idx + 1, apiKey, requestBody, statusMsg, token, statusEl);
+      attemptedErrors.push(model + " => " + statusMsg);
+      return callGeminiWithFallback(modelCandidates, idx + 1, apiKey, requestBody, statusMsg, token, statusEl, attemptedErrors);
     });
   }).catch(function (err) {
     if (token !== activeGenerateToken || (err && err.message === "CANCELLED")) {
@@ -925,21 +986,24 @@ function callGeminiWithFallback(modelCandidates, idx, apiKey, requestBody, lastE
     if (err && err.isNetworkError) {
       if (typeof google !== "undefined" && google.script && google.script.run) {
         if (statusEl) {
-          statusEl.textContent = "直接通信に失敗したため、GASサーバー経由でAIへ再接続しています...";
+          statusEl.textContent = "直接通信に失敗したため、GASサーバー経由でAI (" + model + ") へ再接続しています...";
         }
-        return callGeminiViaGasServer(apiKey, requestBody, token).catch(function (gasErr) {
+        return callGeminiViaGasServer(apiKey, requestBody, token, model).catch(function (gasErr) {
           if (gasErr && gasErr.isMissingServerFn) {
             const combined = new Error("ブラウザからの直接通信に失敗しました（学校ネットワーク等で遮断されている可能性があります）");
             combined.needsGasCodeUpdate = true;
             throw combined;
           }
-          throw gasErr;
+          const msg = (gasErr && gasErr.message) ? gasErr.message : String(gasErr);
+          attemptedErrors.push(model + " (GAS経由) => " + msg);
+          return callGeminiWithFallback(modelCandidates, idx + 1, apiKey, requestBody, msg, token, statusEl, attemptedErrors);
         });
       }
       throw err;
     }
     const msg = err && err.message ? err.message : String(err);
-    return callGeminiWithFallback(modelCandidates, idx + 1, apiKey, requestBody, msg, token, statusEl);
+    attemptedErrors.push(model + " => " + msg);
+    return callGeminiWithFallback(modelCandidates, idx + 1, apiKey, requestBody, msg, token, statusEl, attemptedErrors);
   });
 }
 
@@ -1050,8 +1114,34 @@ function handleGenerateClick() {
           }
         };
 
-        const modelCandidates = ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
-        return callGeminiWithFallback(modelCandidates, 0, apiKey, requestBody, "", myToken, loadingStatusText);
+        if (loadingStatusText) {
+          loadingStatusText.textContent = "利用可能なAIモデルを検索・適合中...";
+        }
+        return fetchAvailableModels(apiKey).then(function (discovered) {
+          if (myToken !== activeGenerateToken) throw new Error("CANCELLED");
+          const staticFallbacks = [
+            "gemini-2.5-flash",
+            "gemini-3.8-flash",
+            "gemini-2.5-pro",
+            "gemini-2.0-flash",
+            "gemini-1.5-flash-latest",
+            "gemini-1.5-pro"
+          ];
+          const finalCandidates = [];
+          if (Array.isArray(discovered) && discovered.length > 0) {
+            for (let d = 0; d < discovered.length; d++) {
+              if (finalCandidates.indexOf(discovered[d]) === -1) {
+                finalCandidates.push(discovered[d]);
+              }
+            }
+          }
+          for (let s = 0; s < staticFallbacks.length; s++) {
+            if (finalCandidates.indexOf(staticFallbacks[s]) === -1) {
+              finalCandidates.push(staticFallbacks[s]);
+            }
+          }
+          return callGeminiWithFallback(finalCandidates, 0, apiKey, requestBody, "", myToken, loadingStatusText, []);
+        });
       })
       .then(function (responseData) {
         if (myToken !== activeGenerateToken) {

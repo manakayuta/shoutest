@@ -188,46 +188,116 @@ function uploadImageServer(folderUrl, base64Image, filename) {
 }
 
 // 5b. 問題作成スタジオ用 Gemini API サーバー中継（ブラウザ側fetch遮断・タイムアウト時の自動フォールバック）
-function generateQuizServer(apiKey, requestBody) {
+function generateQuizServer(apiKey, requestBody, preferredModel) {
   const key = String(apiKey || "").trim();
   if (!key) {
     throw new Error("Gemini APIキーが指定されていません。");
   }
-  const modelCandidates = ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
-  let lastErr = "Gemini API への接続に失敗しました";
 
-  for (let i = 0; i < modelCandidates.length; i++) {
-    const model = modelCandidates[i];
+  const candidates = [];
+  if (preferredModel && typeof preferredModel === "string" && preferredModel.trim()) {
+    candidates.push(preferredModel.trim());
+  }
+
+  // 自動取得された最新のアクティブモデル
+  const serverDiscovered = listModelsServer(key);
+  if (Array.isArray(serverDiscovered) && serverDiscovered.length > 0) {
+    for (let d = 0; d < serverDiscovered.length; d++) {
+      if (candidates.indexOf(serverDiscovered[d]) === -1) {
+        candidates.push(serverDiscovered[d]);
+      }
+    }
+  }
+
+  // フォールバック候補（廃止済みの旧モデル名 gemini-1.5-flash は除外）
+  const staticList = [
+    "gemini-2.5-flash",
+    "gemini-3.8-flash",
+    "gemini-2.5-pro",
+    "gemini-2.0-flash",
+    "gemini-1.5-flash-latest",
+    "gemini-1.5-pro"
+  ];
+  for (let s = 0; s < staticList.length; s++) {
+    if (candidates.indexOf(staticList[s]) === -1) {
+      candidates.push(staticList[s]);
+    }
+  }
+
+  const attempted = [];
+  for (let i = 0; i < candidates.length; i++) {
+    const model = candidates[i];
     const url = "https://generativelanguage.googleapis.com/v1beta/models/" +
       encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(key);
 
-    const res = UrlFetchApp.fetch(url, {
-      method: "post",
-      contentType: "application/json",
-      payload: JSON.stringify(requestBody),
-      muteHttpExceptions: true
-    });
-
-    const code = res.getResponseCode();
-    const text = res.getContentText();
-    if (code >= 200 && code < 300) {
-      return JSON.parse(text);
-    }
-
-    let apiErrMsg = "HTTP " + code;
     try {
-      const parsedErr = JSON.parse(text);
-      if (parsedErr && parsedErr.error && parsedErr.error.message) {
-        apiErrMsg = "HTTP " + code + ": " + parsedErr.error.message;
-      }
-    } catch (e) {}
+      const res = UrlFetchApp.fetch(url, {
+        method: "post",
+        contentType: "application/json",
+        payload: JSON.stringify(requestBody),
+        muteHttpExceptions: true
+      });
 
-    lastErr = apiErrMsg + " (model: " + model + ")";
-    if (code === 400 || code === 401 || code === 403 || code === 429) {
-      throw new Error("Gemini API エラー (" + apiErrMsg + ")");
+      const code = res.getResponseCode();
+      const text = res.getContentText();
+      if (code >= 200 && code < 300) {
+        return JSON.parse(text);
+      }
+
+      let apiErrMsg = "HTTP " + code;
+      try {
+        const parsedErr = JSON.parse(text);
+        if (parsedErr && parsedErr.error && parsedErr.error.message) {
+          apiErrMsg = "HTTP " + code + ": " + parsedErr.error.message;
+        }
+      } catch (e) {}
+
+      attempted.push(model + " => " + apiErrMsg);
+      if (code === 400 || code === 401 || code === 403 || code === 429) {
+        throw new Error("Gemini API エラー (" + apiErrMsg + ")");
+      }
+    } catch (fetchErr) {
+      const fetchMsg = (fetchErr && fetchErr.message) ? fetchErr.message : String(fetchErr);
+      if (fetchMsg.indexOf("Gemini API エラー") !== -1) {
+        throw fetchErr;
+      }
+      attempted.push(model + " => " + fetchMsg);
     }
   }
-  throw new Error("Gemini API エラー (" + lastErr + ")");
+  throw new Error("Gemini API エラー (試行全モデル失敗: " + attempted.join(" | ") + ")");
+}
+
+// 5c. 利用可能なモデル一覧取得（GASサーバー側・動的適合）
+function listModelsServer(apiKey) {
+  const key = String(apiKey || "").trim();
+  if (!key) return [];
+  try {
+    const url = "https://generativelanguage.googleapis.com/v1beta/models?key=" + encodeURIComponent(key);
+    const res = UrlFetchApp.fetch(url, { muteHttpExceptions: true });
+    if (res.getResponseCode() >= 200 && res.getResponseCode() < 300) {
+      const data = JSON.parse(res.getContentText());
+      if (data && Array.isArray(data.models)) {
+        const list = [];
+        data.models.forEach(function (m) {
+          if (m && m.name && Array.isArray(m.supportedGenerationMethods)) {
+            if (m.supportedGenerationMethods.indexOf("generateContent") !== -1) {
+              let name = m.name;
+              if (name.indexOf("models/") === 0) name = name.substring(7);
+              list.push(name);
+            }
+          }
+        });
+        list.sort(function (a, b) {
+          const aFlash = a.indexOf("flash") !== -1 ? 1 : 0;
+          const bFlash = b.indexOf("flash") !== -1 ? 1 : 0;
+          if (aFlash !== bFlash) return bFlash - aFlash;
+          return b.localeCompare(a);
+        });
+        return list;
+      }
+    }
+  } catch (e) {}
+  return [];
 }
 
 // 6. 外部通信用（POST）
