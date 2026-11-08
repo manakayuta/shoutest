@@ -1,6 +1,7 @@
 /**
  * ========================================================
- * 数学小テスト 問題作成スタジオ ロジック (creator.js)
+ * 数学小テスト 問題作成スタジオ ロジック v2.0 (creator.js)
+ * GAS (HtmlService iframe) およびローカル環境 両対応・完全堅牢版
  * ========================================================
  */
 
@@ -9,70 +10,33 @@ const STORAGE_KEY_API = "quick_quiz_gemini_api_key";
 const STORAGE_KEY_FOLDER = "quick_quiz_drive_folder_url";
 const DEFAULT_GAS_URL = "https://script.google.com/a/macros/hjs.ed.jp/s/AKfycbxq7__DQzX4ci12QfJVhdmWMmAFzCa320LhOSOgl62e5q0idB9U5JJgwSURxRgNBgQk/exec";
 
-// DOM要素
-const apiKeyInput = document.getElementById("apiKeyInput");
-const toggleApiVisibilityBtn = document.getElementById("toggleApiVisibilityBtn");
-const apiSavedNotice = document.getElementById("apiSavedNotice");
-
-const driveFolderUrlInput = document.getElementById("driveFolderUrlInput");
-const folderSavedNotice = document.getElementById("folderSavedNotice");
-
-const dropZone = document.getElementById("dropZone");
-const fileInput = document.getElementById("fileInput");
-const dropZoneContent = document.getElementById("dropZoneContent");
-const sourceImagePreviewWrapper = document.getElementById("sourceImagePreviewWrapper");
-const sourceImagePreview = document.getElementById("sourceImagePreview");
-const clearImgBtn = document.getElementById("clearImgBtn");
-
-const customPromptInput = document.getElementById("customPromptInput");
-const generateBtn = document.getElementById("generateBtn");
-
-const placeholderBox = document.getElementById("placeholderBox");
-const loadingBox = document.getElementById("loadingBox");
-const loadingStatusText = document.getElementById("loadingStatusText");
-const resultArea = document.getElementById("resultArea");
-
-const resultTitleInput = document.getElementById("resultTitleInput");
-const problemCard = document.getElementById("problemCard");
-const problemCardContent = document.getElementById("problemCardContent");
-const explanationCard = document.getElementById("explanationCard");
-const explanationCardContent = document.getElementById("explanationCardContent");
-
-const choicesLabel = document.getElementById("choicesLabel");
-const choicesInput = document.getElementById("choicesInput");
-const correctAnswerInput = document.getElementById("correctAnswerInput");
-
-const exportBtn = document.getElementById("exportBtn");
-const exportBtnText = document.getElementById("exportBtnText");
-const copySuccessMessage = document.getElementById("copySuccessMessage");
-
 // 状態変数
 let currentImageBase64 = null;
 let currentGeneratedData = null;
 
-// 安全なストレージ操作ラッパー（GAS iframeやプライベートモードでの例外を防止）
+// DOM要素を常に最新で取得するヘルパー（GASの遅延DOM構築でも絶対にnullにならない）
+function el(id) {
+  return document.getElementById(id);
+}
+
+// 安全なストレージ操作ラッパー（GAS iframeやサードパーティCookie制限下での例外を防止）
 const safeStorage = {
   get(key) {
     try {
-      return localStorage.getItem(key);
+      return window.localStorage ? window.localStorage.getItem(key) : null;
     } catch (e) {
-      console.warn("localStorage get error:", e);
       return null;
     }
   },
   set(key, val) {
     try {
-      localStorage.setItem(key, val);
-    } catch (e) {
-      console.warn("localStorage set error:", e);
-    }
+      if (window.localStorage) window.localStorage.setItem(key, val);
+    } catch (e) {}
   },
   remove(key) {
     try {
-      localStorage.removeItem(key);
-    } catch (e) {
-      console.warn("localStorage remove error:", e);
-    }
+      if (window.localStorage) window.localStorage.removeItem(key);
+    } catch (e) {}
   }
 };
 
@@ -80,186 +44,175 @@ const safeStorage = {
 // 1. 初期ロード & 設定の復元（自動記憶）
 // ==========================================
 function initSettings() {
+  const apiKeyInput = el("apiKeyInput");
+  const apiSavedNotice = el("apiSavedNotice");
+  const driveFolderUrlInput = el("driveFolderUrlInput");
+  const folderSavedNotice = el("folderSavedNotice");
+
   // APIキーの復元
   const savedApiKey = safeStorage.get(STORAGE_KEY_API);
-  if (savedApiKey && apiKeyInput) {
+  if (savedApiKey && apiKeyInput && !apiKeyInput.value) {
     apiKeyInput.value = savedApiKey;
-    if (apiSavedNotice) apiSavedNotice.style.display = "inline-block";
-  } else if (apiSavedNotice) {
-    apiSavedNotice.style.display = "none";
+  }
+  if (apiSavedNotice) {
+    apiSavedNotice.style.display = (apiKeyInput && apiKeyInput.value.trim()) ? "inline-block" : "none";
   }
 
   // フォルダURLの復元
   const savedFolderUrl = safeStorage.get(STORAGE_KEY_FOLDER);
-  if (savedFolderUrl && driveFolderUrlInput) {
+  if (savedFolderUrl && driveFolderUrlInput && !driveFolderUrlInput.value) {
     driveFolderUrlInput.value = savedFolderUrl;
-    if (folderSavedNotice) folderSavedNotice.style.display = "inline-block";
-  } else if (folderSavedNotice) {
-    folderSavedNotice.style.display = "none";
+  }
+  if (folderSavedNotice) {
+    folderSavedNotice.style.display = (driveFolderUrlInput && driveFolderUrlInput.value.trim()) ? "inline-block" : "none";
   }
 
   checkReadyToGenerate();
 }
 
-// DOM読み込み完了時に初期化（GAS等のiframe環境でも確実に実行）
+// あらゆる読み込みタイミングで確実に初期化を実行
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", initSettings);
 } else {
   initSettings();
 }
+window.addEventListener("load", initSettings);
+setTimeout(initSettings, 200);
 
-// APIキーの入力時即座自動保存
-if (apiKeyInput) {
-  apiKeyInput.addEventListener("input", () => {
-    const key = apiKeyInput.value.trim();
-    if (key) {
-      safeStorage.set(STORAGE_KEY_API, key);
-      if (apiSavedNotice) apiSavedNotice.style.display = "inline-block";
-    } else {
-      safeStorage.remove(STORAGE_KEY_API);
-      if (apiSavedNotice) apiSavedNotice.style.display = "none";
-    }
-    checkReadyToGenerate();
-  });
-}
+// APIキー入力ハンドラ
+window.onApiKeyInput = function () {
+  const apiKeyInput = el("apiKeyInput");
+  const apiSavedNotice = el("apiSavedNotice");
+  if (!apiKeyInput) return;
 
-if (toggleApiVisibilityBtn && apiKeyInput) {
-  toggleApiVisibilityBtn.addEventListener("click", () => {
-    if (apiKeyInput.type === "password") {
-      apiKeyInput.type = "text";
-      toggleApiVisibilityBtn.textContent = "🙈";
-    } else {
-      apiKeyInput.type = "password";
-      toggleApiVisibilityBtn.textContent = "👁️";
-    }
-  });
-}
+  const key = apiKeyInput.value.trim();
+  if (key) {
+    safeStorage.set(STORAGE_KEY_API, key);
+    if (apiSavedNotice) apiSavedNotice.style.display = "inline-block";
+  } else {
+    safeStorage.remove(STORAGE_KEY_API);
+    if (apiSavedNotice) apiSavedNotice.style.display = "none";
+  }
+  checkReadyToGenerate();
+};
 
-// フォルダURLの入力時即座自動保存
-if (driveFolderUrlInput) {
-  driveFolderUrlInput.addEventListener("input", () => {
-    const url = driveFolderUrlInput.value.trim();
-    if (url) {
-      safeStorage.set(STORAGE_KEY_FOLDER, url);
-      if (folderSavedNotice) folderSavedNotice.style.display = "inline-block";
-    } else {
-      safeStorage.remove(STORAGE_KEY_FOLDER);
-      if (folderSavedNotice) folderSavedNotice.style.display = "none";
-    }
-  });
-}
+// APIキー表示切り替え
+window.onToggleApiVis = function () {
+  const apiKeyInput = el("apiKeyInput");
+  const toggleBtn = el("toggleApiVisibilityBtn");
+  if (!apiKeyInput || !toggleBtn) return;
+
+  if (apiKeyInput.type === "password") {
+    apiKeyInput.type = "text";
+    toggleBtn.textContent = "🙈";
+  } else {
+    apiKeyInput.type = "password";
+    toggleBtn.textContent = "👁️";
+  }
+};
+
+// フォルダURL入力ハンドラ
+window.onFolderUrlInput = function () {
+  const driveFolderUrlInput = el("driveFolderUrlInput");
+  const folderSavedNotice = el("folderSavedNotice");
+  if (!driveFolderUrlInput) return;
+
+  const url = driveFolderUrlInput.value.trim();
+  if (url) {
+    safeStorage.set(STORAGE_KEY_FOLDER, url);
+    if (folderSavedNotice) folderSavedNotice.style.display = "inline-block";
+  } else {
+    safeStorage.remove(STORAGE_KEY_FOLDER);
+    if (folderSavedNotice) folderSavedNotice.style.display = "none";
+  }
+};
 
 // ==========================================
-// 2. 画像の取り込み（ファイル選択・D&D・Ctrl+V）
+// 2. 画像の取り込み（ファイル選択・D&D・ボタン貼付・Ctrl+V）
 // ==========================================
 function handleImageFile(file) {
   if (!file) return;
 
-  // 画像判定（MIMEタイプ、拡張子、またはBlobサイズ）
   const isImage = (file.type && file.type.startsWith("image/")) ||
                   /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(file.name || "") ||
                   (file.size > 0 && (!file.type || file.type === "image"));
 
   if (!isImage) {
-    alert("画像ファイル（PNG, JPEG 等）を選択してください。");
+    alert("画像ファイル（PNG, JPG 等）を選択してください。");
     return;
   }
 
   const reader = new FileReader();
-  reader.onload = (e) => {
+  reader.onload = function (e) {
     currentImageBase64 = e.target.result;
+    const sourceImagePreview = el("sourceImagePreview");
+    const dropZoneContent = el("dropZoneContent");
+    const sourceImagePreviewWrapper = el("sourceImagePreviewWrapper");
+
     if (sourceImagePreview) sourceImagePreview.src = currentImageBase64;
     if (dropZoneContent) dropZoneContent.classList.add("hidden");
     if (sourceImagePreviewWrapper) sourceImagePreviewWrapper.classList.remove("hidden");
     checkReadyToGenerate();
   };
-  reader.onerror = () => {
+  reader.onerror = function () {
     alert("画像の読み込みに失敗しました。もう一度お試しください。");
   };
   reader.readAsDataURL(file);
 }
 
-// input type="file" のチェンジイベント
-if (fileInput) {
-  fileInput.addEventListener("change", (e) => {
-    if (e.target.files && e.target.files[0]) {
-      handleImageFile(e.target.files[0]);
-    }
-  });
+// ① ファイル選択ボタンからの変更イベント
+window.onFileInputChange = function (inputEl) {
+  if (inputEl && inputEl.files && inputEl.files[0]) {
+    handleImageFile(inputEl.files[0]);
+    // 次回同じファイルを選択してもchangeが発火するように読み込み開始後にリセット
+    setTimeout(() => {
+      try { inputEl.value = ""; } catch (e) {}
+    }, 300);
+  }
+};
 
-  // ファイル選択ダイアログを毎回確実に反応させる
-  fileInput.addEventListener("click", (e) => {
-    e.stopPropagation();
-    fileInput.value = "";
-  });
-}
-
-// ドロップゾーン全体のクリックで確実にファイル選択ダイアログを起動
-if (dropZone) {
-  dropZone.addEventListener("click", (e) => {
-    if (e.target !== fileInput && e.target.id !== "clearImgBtn" && !e.target.closest("#clearImgBtn")) {
-      if (fileInput) fileInput.click();
-    }
-  });
-}
-
-// ウィンドウ全体でのドラッグ＆ドロップによるページ遷移防止
-["dragenter", "dragover", "dragleave", "drop"].forEach((eventName) => {
-  window.addEventListener(eventName, (e) => {
-    e.preventDefault();
-  }, false);
-});
-
-// ドラッグ＆ドロップ
-if (dropZone) {
-  dropZone.addEventListener("dragover", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    dropZone.classList.add("drag-over");
-  });
-
-  dropZone.addEventListener("dragleave", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    dropZone.classList.remove("drag-over");
-  });
-
-  dropZone.addEventListener("drop", (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    dropZone.classList.remove("drag-over");
-
-    const files = e.dataTransfer?.files;
-    if (files && files.length > 0) {
-      handleImageFile(files[0]);
-      return;
-    }
-
-    const items = e.dataTransfer?.items;
-    if (items && items.length > 0) {
-      for (let i = 0; i < items.length; i++) {
-        if (items[i].kind === "file") {
-          const f = items[i].getAsFile();
-          if (f) {
-            handleImageFile(f);
+// ② 「📋 スクショを貼り付け」ボタンクリック
+window.onPasteButtonClick = async function () {
+  // Clipboard API が使える場合はワンクリックで画像を読み取る
+  if (navigator.clipboard && typeof navigator.clipboard.read === "function") {
+    try {
+      const clipboardItems = await navigator.clipboard.read();
+      for (const item of clipboardItems) {
+        const imageType = item.types.find(type => type.startsWith("image/"));
+        if (imageType) {
+          const blob = await item.getType(imageType);
+          if (blob) {
+            handleImageFile(blob);
             return;
           }
         }
       }
+      alert("クリップボードに画像が見つかりませんでした。\n画面切り取り（Win + Shift + S 等）で画像をコピーしてから押してください。");
+      return;
+    } catch (err) {
+      // GASのiframe等でClipboard API権限がブロックされた場合は、専用入力欄にフォーカスしてCtrl+Vを促す
+      console.warn("Clipboard API fallback to paste input:", err);
     }
-  });
-}
+  }
 
-// Ctrl + V（クリップボード貼り付け）
-function handlePaste(e) {
+  // フォールバック：ペースト受信用ボックスにフォーカスを当てて Ctrl+V を案内
+  const pasteInput = el("pasteCatcherInput");
+  if (pasteInput) {
+    pasteInput.focus();
+    pasteInput.value = "";
+    pasteInput.placeholder = "⌨️ そのままキーボードの Ctrl + V を押してください！";
+  }
+};
+
+// ③ Ctrl + V ペースト処理
+window.onPasteEvent = function (e) {
   const clipboardData = e.clipboardData || window.clipboardData;
   if (!clipboardData) return;
 
-  // 1. filesから探す (ファイルコピー対応)
-  const files = clipboardData.files;
-  if (files && files.length > 0) {
-    for (let i = 0; i < files.length; i++) {
-      const f = files[i];
+  // 1. filesリストから画像を探す
+  if (clipboardData.files && clipboardData.files.length > 0) {
+    for (let i = 0; i < clipboardData.files.length; i++) {
+      const f = clipboardData.files[i];
       if ((f.type && f.type.startsWith("image/")) || /\.(png|jpe?g|gif|webp|bmp)$/i.test(f.name || "")) {
         e.preventDefault();
         handleImageFile(f);
@@ -268,11 +221,10 @@ function handlePaste(e) {
     }
   }
 
-  // 2. itemsから探す (画面切り取り・スクショ貼り付け対応)
-  const items = clipboardData.items;
-  if (items && items.length > 0) {
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
+  // 2. itemsリストから画像を探す（Snipping Tool等のスクショ）
+  if (clipboardData.items && clipboardData.items.length > 0) {
+    for (let i = 0; i < clipboardData.items.length; i++) {
+      const item = clipboardData.items[i];
       if (item.type && item.type.indexOf("image") !== -1) {
         const blob = item.getAsFile();
         if (blob) {
@@ -283,25 +235,84 @@ function handlePaste(e) {
       }
     }
   }
-}
+};
 
-window.addEventListener("paste", handlePaste);
-document.addEventListener("paste", handlePaste);
+// 画面全体での Ctrl + V も常時キャッチ
+window.addEventListener("paste", window.onPasteEvent);
+document.addEventListener("paste", window.onPasteEvent);
 
-if (clearImgBtn) {
-  clearImgBtn.addEventListener("click", (e) => {
+// ④ ドラッグ＆ドロップ処理
+["dragenter", "dragover", "dragleave", "drop"].forEach((eventName) => {
+  window.addEventListener(eventName, (e) => {
+    e.preventDefault();
+  }, false);
+});
+
+window.onDragOver = function (e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const dz = el("dropZone");
+  if (dz) dz.classList.add("drag-over");
+};
+
+window.onDragLeave = function (e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const dz = el("dropZone");
+  if (dz) dz.classList.remove("drag-over");
+};
+
+window.onDropFile = function (e) {
+  e.preventDefault();
+  e.stopPropagation();
+  const dz = el("dropZone");
+  if (dz) dz.classList.remove("drag-over");
+
+  const dt = e.dataTransfer;
+  if (!dt) return;
+
+  if (dt.files && dt.files.length > 0) {
+    handleImageFile(dt.files[0]);
+    return;
+  }
+
+  if (dt.items && dt.items.length > 0) {
+    for (let i = 0; i < dt.items.length; i++) {
+      if (dt.items[i].kind === "file") {
+        const f = dt.items[i].getAsFile();
+        if (f) {
+          handleImageFile(f);
+          return;
+        }
+      }
+    }
+  }
+};
+
+// ⑤ 画像削除ボタン
+window.onClearImage = function (e) {
+  if (e) {
     e.preventDefault();
     e.stopPropagation();
-    currentImageBase64 = null;
-    if (fileInput) fileInput.value = "";
-    if (sourceImagePreview) sourceImagePreview.src = "";
-    if (sourceImagePreviewWrapper) sourceImagePreviewWrapper.classList.add("hidden");
-    if (dropZoneContent) dropZoneContent.classList.remove("hidden");
-    checkReadyToGenerate();
-  });
-}
+  }
+  currentImageBase64 = null;
+  const fileInput = el("fileInput");
+  const sourceImagePreview = el("sourceImagePreview");
+  const sourceImagePreviewWrapper = el("sourceImagePreviewWrapper");
+  const dropZoneContent = el("dropZoneContent");
+  const pasteInput = el("pasteCatcherInput");
+
+  if (fileInput) fileInput.value = "";
+  if (sourceImagePreview) sourceImagePreview.src = "";
+  if (sourceImagePreviewWrapper) sourceImagePreviewWrapper.classList.add("hidden");
+  if (dropZoneContent) dropZoneContent.classList.remove("hidden");
+  if (pasteInput) pasteInput.placeholder = "💡 ここをクリックして Ctrl + V でも直接貼り付けできます";
+  checkReadyToGenerate();
+};
 
 function checkReadyToGenerate() {
+  const apiKeyInput = el("apiKeyInput");
+  const generateBtn = el("generateBtn");
   const hasKey = apiKeyInput ? apiKeyInput.value.trim().length > 0 : false;
   const hasImage = currentImageBase64 !== null;
   if (generateBtn) generateBtn.disabled = !(hasKey && hasImage);
@@ -310,11 +321,20 @@ function checkReadyToGenerate() {
 // ==========================================
 // 3. Gemini API による解析・改題・生成
 // ==========================================
-generateBtn.addEventListener("click", async () => {
-  const apiKey = apiKeyInput.value.trim();
+window.onGenerateClick = async function () {
+  const apiKeyInput = el("apiKeyInput");
+  const customPromptInput = el("customPromptInput");
+  const placeholderBox = el("placeholderBox");
+  const resultArea = el("resultArea");
+  const loadingBox = el("loadingBox");
+  const loadingStatusText = el("loadingStatusText");
+  const copySuccessMessage = el("copySuccessMessage");
+  const generateBtn = el("generateBtn");
+
+  const apiKey = apiKeyInput ? apiKeyInput.value.trim() : "";
   if (!apiKey) {
     alert("Gemini APIキーを入力してください。");
-    apiKeyInput.focus();
+    if (apiKeyInput) apiKeyInput.focus();
     return;
   }
   if (!currentImageBase64) {
@@ -322,25 +342,25 @@ generateBtn.addEventListener("click", async () => {
     return;
   }
 
-  const remakeMode = document.querySelector('input[name="remakeMode"]:checked').value;
-  const questionType = document.querySelector('input[name="questionType"]:checked').value;
-  const customPrompt = customPromptInput.value.trim();
+  const remakeRadio = document.querySelector('input[name="remakeMode"]:checked');
+  const typeRadio = document.querySelector('input[name="questionType"]:checked');
+  const remakeMode = remakeRadio ? remakeRadio.value : "exact";
+  const questionType = typeRadio ? typeRadio.value : "マーク";
+  const customPrompt = customPromptInput ? customPromptInput.value.trim() : "";
 
   // UI切り替え: ローディング表示
-  placeholderBox.classList.add("hidden");
-  resultArea.classList.add("hidden");
-  loadingBox.classList.remove("hidden");
-  copySuccessMessage.classList.add("hidden");
-  generateBtn.disabled = true;
+  if (placeholderBox) placeholderBox.classList.add("hidden");
+  if (resultArea) resultArea.classList.add("hidden");
+  if (loadingBox) loadingBox.classList.remove("hidden");
+  if (copySuccessMessage) copySuccessMessage.classList.add("hidden");
+  if (generateBtn) generateBtn.disabled = true;
 
   try {
-    loadingStatusText.textContent = "AIが画像を解析し、数式と問題を構成しています...";
+    if (loadingStatusText) loadingStatusText.textContent = "AIが画像を解析し、数式と問題を構成しています...";
 
-    // Base64データから純粋な画像データとMIMEタイプを抽出
     const mimeType = currentImageBase64.split(";")[0].split(":")[1];
     const base64Data = currentImageBase64.split(",")[1];
 
-    // プロンプトの組み立て
     const systemPrompt = `
 あなたは日本の高校数学の優秀な教員であり教材作成のスペシャリストです。
 添付された数学の問題画像を読み取り、指定されたルールに従って小テスト用データをJSON形式で出力してください。
@@ -373,7 +393,6 @@ ${customPrompt ? `- 追加指示: ${customPrompt}` : ""}
 }
 `;
 
-    // リクエストボディ
     const requestBody = {
       contents: [
         {
@@ -394,7 +413,6 @@ ${customPrompt ? `- 追加指示: ${customPrompt}` : ""}
       }
     };
 
-    // Gemini API リクエスト（Google最新指定の gemini-3.8-flash を最優先）
     const modelCandidates = ["gemini-3.8-flash", "gemini-1.5-flash", "gemini-2.0-flash"];
     let response = null;
     let lastErrorMsg = "";
@@ -429,10 +447,8 @@ ${customPrompt ? `- 追加指示: ${customPrompt}` : ""}
       throw new Error("AIから応答が得られませんでした。");
     }
 
-    // JSONパース
     let parsedData;
     try {
-      // 余計なマークダウンフェンスをトリム
       const cleanJson = candidateText.replace(/^```json\s*/, "").replace(/\s*```$/, "").trim();
       parsedData = JSON.parse(cleanJson);
     } catch (e) {
@@ -441,44 +457,49 @@ ${customPrompt ? `- 追加指示: ${customPrompt}` : ""}
     }
 
     currentGeneratedData = parsedData;
-
-    // プレビュー画面の描画
     renderPreview(parsedData);
 
-    loadingBox.classList.add("hidden");
-    resultArea.classList.remove("hidden");
+    if (loadingBox) loadingBox.classList.add("hidden");
+    if (resultArea) resultArea.classList.remove("hidden");
   } catch (error) {
     console.error("生成エラー:", error);
     alert(`生成に失敗しました: ${error.message}`);
-    loadingBox.classList.add("hidden");
-    placeholderBox.classList.remove("hidden");
+    if (loadingBox) loadingBox.classList.add("hidden");
+    if (placeholderBox) placeholderBox.classList.remove("hidden");
   } finally {
-    generateBtn.disabled = false;
+    if (generateBtn) generateBtn.disabled = false;
   }
-});
+};
 
 // ==========================================
 // 4. プレビューの描画とKaTeX数式レンダリング
 // ==========================================
 function renderPreview(data) {
-  resultTitleInput.value = data.title || "数学 小テスト";
+  const resultTitleInput = el("resultTitleInput");
+  const problemCardContent = el("problemCardContent");
+  const explanationCardContent = el("explanationCardContent");
+  const choicesLabel = el("choicesLabel");
+  const choicesInput = el("choicesInput");
+  const correctAnswerInput = el("correctAnswerInput");
 
-  // 問題文のレンダリング
-  problemCardContent.innerHTML = formatMarkdownMath(data.problemMarkdown);
-  renderMath(problemCardContent);
+  if (resultTitleInput) resultTitleInput.value = data.title || "数学 小テスト";
 
-  // 解説のレンダリング
-  explanationCardContent.innerHTML = formatMarkdownMath(data.explanationMarkdown);
-  renderMath(explanationCardContent);
+  if (problemCardContent) {
+    problemCardContent.innerHTML = formatMarkdownMath(data.problemMarkdown);
+    renderMath(problemCardContent);
+  }
 
-  // 枠・選択肢
+  if (explanationCardContent) {
+    explanationCardContent.innerHTML = formatMarkdownMath(data.explanationMarkdown);
+    renderMath(explanationCardContent);
+  }
+
   const isMark = (data.type === "マーク" || data.type === "マーク式");
-  choicesLabel.textContent = isMark ? "マーク枠ラベル（カンマ区切り）" : "選択肢（カンマ区切り）";
-  choicesInput.value = (data.slotsOrChoices || []).join(", ");
-  correctAnswerInput.value = data.correctAnswer || "";
+  if (choicesLabel) choicesLabel.textContent = isMark ? "マーク枠ラベル（カンマ区切り）" : "選択肢（カンマ区切り）";
+  if (choicesInput) choicesInput.value = (data.slotsOrChoices || []).join(", ");
+  if (correctAnswerInput) correctAnswerInput.value = data.correctAnswer || "";
 }
 
-// 改行や太字の簡易変換
 function formatMarkdownMath(text) {
   if (!text) return "";
   return text
@@ -487,7 +508,6 @@ function formatMarkdownMath(text) {
     .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
 }
 
-// KaTeX の自動数式レンダリング
 function renderMath(element) {
   if (typeof renderMathInElement === "function") {
     renderMathInElement(element, {
@@ -505,30 +525,38 @@ function renderMath(element) {
 // ==========================================
 // 5. ドライブ保存 ＆ スプレッドシート用TSVコピー
 // ==========================================
-exportBtn.addEventListener("click", async () => {
-  const folderUrl = driveFolderUrlInput.value.trim();
-  const title = resultTitleInput.value.trim() || "小テスト";
-  const type = currentGeneratedData.type || "マーク";
-  const rawChoices = choicesInput.value.split(",").map(s => s.trim()).filter(s => s !== "");
-  const correctAnswer = correctAnswerInput.value.trim();
+window.onExportClick = async function () {
+  const driveFolderUrlInput = el("driveFolderUrlInput");
+  const resultTitleInput = el("resultTitleInput");
+  const choicesInput = el("choicesInput");
+  const correctAnswerInput = el("correctAnswerInput");
+  const problemCard = el("problemCard");
+  const copySuccessMessage = el("copySuccessMessage");
+  const exportBtn = el("exportBtn");
+  const exportBtnText = el("exportBtnText");
 
-  copySuccessMessage.classList.add("hidden");
-  exportBtn.disabled = true;
-  exportBtnText.textContent = "問題画像を生成中...";
+  const folderUrl = driveFolderUrlInput ? driveFolderUrlInput.value.trim() : "";
+  const title = (resultTitleInput && resultTitleInput.value.trim()) || "小テスト";
+  const type = (currentGeneratedData && currentGeneratedData.type) || "マーク";
+  const rawChoices = choicesInput ? choicesInput.value.split(",").map(s => s.trim()).filter(s => s !== "") : [];
+  const correctAnswer = correctAnswerInput ? correctAnswerInput.value.trim() : "";
+
+  if (copySuccessMessage) copySuccessMessage.classList.add("hidden");
+  if (exportBtn) exportBtn.disabled = true;
+  if (exportBtnText) exportBtnText.textContent = "問題画像を生成中...";
 
   try {
-    // 1. 問題カードを html2canvas で高品質PNG画像化
     const canvas = await html2canvas(problemCard, {
-      scale: 2, // 高解像度（Retina/印刷クオリティ）
+      scale: 2,
       backgroundColor: "#ffffff"
     });
     const problemImageBase64 = canvas.toDataURL("image/png");
 
     let finalImageUrl = "";
 
-    // 2. Googleドライブへの自動アップロード
+    // Googleドライブへの自動アップロード
     if (folderUrl && folderUrl.includes("drive.google.com")) {
-      exportBtnText.textContent = "Googleドライブに保存中...";
+      if (exportBtnText) exportBtnText.textContent = "Googleドライブに保存中...";
 
       try {
         if (typeof google !== "undefined" && google.script && google.script.run) {
@@ -567,26 +595,10 @@ exportBtn.addEventListener("click", async () => {
       }
     }
 
-    // もしドライブAPI未連携、またはエラーの場合はローカルダウンロード案内
     if (!finalImageUrl) {
-      // プレースホルダーまたは画像ダウンロード
       finalImageUrl = "（Googleドライブ保存完了後にURLが入ります）";
-      // 画像を自動ダウンロード
       downloadBase64Image(problemImageBase64, `${title}_問題.png`);
     }
-
-    // 3. スプレッドシートの C列〜M列 にピッタリ入るタブ区切り文字列（TSV）を作成！
-    // C列: タイトル
-    // D列: 形式 (マーク or 選択)
-    // E列: 画像URL
-    // F列: 選択肢A / 枠ア
-    // G列: 選択肢B / 枠イ
-    // H列: 選択肢C / 枠ウ
-    // I列: 選択肢D / 枠エ
-    // J列: 選択肢E / 枠オ
-    // K列: 選択肢F / 枠カ
-    // L列: 正解
-    // M列: 公開状態 (公開)
 
     const choiceCols = [
       rawChoices[0] || "",
@@ -598,33 +610,31 @@ exportBtn.addEventListener("click", async () => {
     ];
 
     const tsvRow = [
-      title,                                // C列: タイトル
-      (type === "マーク" || type === "マーク式") ? "マーク" : "選択", // D列: 形式
-      finalImageUrl,                        // E列: 画像URL
-      choiceCols[0],                        // F列: 選択肢A
-      choiceCols[1],                        // G列: 選択肢B
-      choiceCols[2],                        // H列: 選択肢C
-      choiceCols[3],                        // I列: 選択肢D
-      choiceCols[4],                        // J列: 選択肢E
-      choiceCols[5],                        // K列: 選択肢F
-      correctAnswer,                        // L列: 正解
-      "公開"                                // M列: 公開状態
-    ].join("\t"); // タブ区切り
+      title,
+      (type === "マーク" || type === "マーク式") ? "マーク" : "選択",
+      finalImageUrl,
+      choiceCols[0],
+      choiceCols[1],
+      choiceCols[2],
+      choiceCols[3],
+      choiceCols[4],
+      choiceCols[5],
+      correctAnswer,
+      "公開"
+    ].join("\t");
 
-    // クリップボードにコピー
     await navigator.clipboard.writeText(tsvRow);
 
-    // 成功メッセージ表示
-    copySuccessMessage.classList.remove("hidden");
-    exportBtnText.textContent = "✓ 保存＆クリップボードにコピー完了！";
+    if (copySuccessMessage) copySuccessMessage.classList.remove("hidden");
+    if (exportBtnText) exportBtnText.textContent = "✓ 保存＆クリップボードにコピー完了！";
   } catch (err) {
     console.error("エクスポートエラー:", err);
     alert(`保存・コピー処理中にエラーが発生しました: ${err.message}`);
-    exportBtnText.textContent = "Googleドライブに保存して、C列貼り付けデータをコピー！";
+    if (exportBtnText) exportBtnText.textContent = "Googleドライブに保存して、C列貼り付けデータをコピー！";
   } finally {
-    exportBtn.disabled = false;
+    if (exportBtn) exportBtn.disabled = false;
   }
-});
+};
 
 function downloadBase64Image(base64Data, filename) {
   const a = document.createElement("a");

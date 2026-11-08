@@ -4,19 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>数学小テスト 問題作成スタジオ (先生専用)</title>
-  <!-- 数式描画ライブラリ KaTeX -->
+  <!-- 数式描画ライブラリ KaTeX CSS -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
-  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
-  <!-- 画像生成ライブラリ html2canvas -->
-  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
   <link rel="stylesheet" href="creator.css">
 </head>
 <body>
   <div class="creator-container">
     <header class="creator-header">
       <div class="header-left">
-        <span class="badge">教員用ツール</span>
+        <span class="badge">教員用ツール v2.0</span>
         <h1>数学小テスト 問題作成スタジオ 🤖</h1>
         <p class="subtitle">問題画像を貼るだけで、改題・マーク枠化・解説作成・ドライブ保存・シート用コピーまで全自動！</p>
       </div>
@@ -33,16 +29,35 @@
         <!-- 画像ドロップ・ペーストエリア -->
         <div class="form-group">
           <label class="form-label">問題画像（Studyaidスクショや写真）</label>
-          <div class="drop-zone" id="dropZone">
-            <input type="file" id="fileInput" accept="image/*" class="file-input">
+          <div class="drop-zone" id="dropZone"
+               ondragenter="window.onDragOver && window.onDragOver(event)"
+               ondragover="window.onDragOver && window.onDragOver(event)"
+               ondragleave="window.onDragLeave && window.onDragLeave(event)"
+               ondrop="window.onDropFile && window.onDropFile(event)">
+            <input type="file" id="fileInput" accept="image/*" class="file-input-hidden"
+                   onchange="window.onFileInputChange && window.onFileInputChange(this)">
             <div class="drop-zone-content" id="dropZoneContent">
               <span class="drop-icon">📸</span>
-              <p class="drop-text"><strong>クリックして画像を選択</strong>、またはドラッグ＆ドロップ</p>
-              <p class="drop-subtext">💡 画面切り取り後、<strong>Ctrl + V</strong> で直接貼り付けも可能！</p>
+              <p class="drop-text">ここに画像を<strong>ドラッグ＆ドロップ</strong>、または下のボタンから取り込み</p>
+              <div class="upload-btn-group">
+                <label for="fileInput" class="upload-action-btn file-select-btn" onclick="event.stopPropagation();">
+                  📁 ファイルを選択
+                </label>
+                <button type="button" class="upload-action-btn clip-paste-btn" id="clipPasteBtn"
+                        onclick="event.stopPropagation(); window.onPasteButtonClick && window.onPasteButtonClick();">
+                  📋 スクショを貼り付け
+                </button>
+              </div>
+              <input type="text" id="pasteCatcherInput" class="paste-catcher-input"
+                     placeholder="💡 ここをクリックして Ctrl + V でも直接貼り付けできます"
+                     readonly
+                     onclick="event.stopPropagation(); this.focus();"
+                     onpaste="window.onPasteEvent && window.onPasteEvent(event)">
             </div>
             <div class="image-preview-wrapper hidden" id="sourceImagePreviewWrapper">
               <img id="sourceImagePreview" src="" alt="元画像プレビュー">
-              <button type="button" class="clear-img-btn" id="clearImgBtn">× 削除</button>
+              <button type="button" class="clear-img-btn" id="clearImgBtn"
+                      onclick="window.onClearImage && window.onClearImage(event)">× 削除</button>
             </div>
           </div>
         </div>
@@ -89,9 +104,11 @@
         <div class="form-group">
           <div class="label-with-badge">
             <label class="form-label" for="driveFolderUrlInput">画像保存先 Googleドライブ フォルダURL</label>
-            <span class="saved-badge" id="folderSavedNotice">自動記憶済 ✓</span>
+            <span class="saved-badge" id="folderSavedNotice" style="display:none;">自動記憶済 ✓</span>
           </div>
-          <input type="text" id="driveFolderUrlInput" class="text-input" placeholder="https://drive.google.com/drive/folders/XXXXX...">
+          <input type="text" id="driveFolderUrlInput" class="text-input"
+                 placeholder="https://drive.google.com/drive/folders/XXXXX..."
+                 oninput="window.onFolderUrlInput && window.onFolderUrlInput()">
           <p class="field-hint">※一度入力すればブラウザが記憶します。いつでも書き換え可能です。</p>
         </div>
 
@@ -99,11 +116,14 @@
         <div class="form-group">
           <div class="label-with-badge">
             <label class="form-label" for="apiKeyInput">Gemini APIキー（無料）</label>
-            <span class="saved-badge" id="apiSavedNotice">自動記憶済 ✓</span>
+            <span class="saved-badge" id="apiSavedNotice" style="display:none;">自動記憶済 ✓</span>
           </div>
           <div class="password-wrapper">
-            <input type="password" id="apiKeyInput" class="text-input" placeholder="AI Studioで発行したAPIキーを貼り付け">
-            <button type="button" id="toggleApiVisibilityBtn" class="toggle-vis-btn">👁️</button>
+            <input type="password" id="apiKeyInput" class="text-input"
+                   placeholder="AI Studioで発行したAPIキーを貼り付け"
+                   oninput="window.onApiKeyInput && window.onApiKeyInput()">
+            <button type="button" id="toggleApiVisibilityBtn" class="toggle-vis-btn"
+                    onclick="window.onToggleApiVis && window.onToggleApiVis()">👁️</button>
           </div>
           <p class="field-hint">
             <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Google AI Studio</a> から1分で無料取得できます。PC内部にのみ安全に保存されます。
@@ -111,7 +131,8 @@
         </div>
 
         <!-- 生成ボタン -->
-        <button type="button" class="generate-btn" id="generateBtn" disabled>
+        <button type="button" class="generate-btn" id="generateBtn" disabled
+                onclick="window.onGenerateClick && window.onGenerateClick()">
           <span class="btn-icon">⚡️</span>
           <span>問題と解説をAI生成する</span>
         </button>
@@ -184,7 +205,8 @@
           </div>
 
           <div class="action-footer">
-            <button type="button" class="export-btn" id="exportBtn">
+            <button type="button" class="export-btn" id="exportBtn"
+                    onclick="window.onExportClick && window.onExportClick()">
               <span class="btn-icon">📋</span>
               <span id="exportBtnText">Googleドライブに保存して、C列貼り付けデータをコピー！</span>
             </button>
@@ -198,5 +220,9 @@
   </div>
 
   <script src="creator.js"></script>
+  <!-- 数式描画・画像化ライブラリ（メインスクリプトをブロックしないよう末尾で読み込み） -->
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 </body>
 </html>

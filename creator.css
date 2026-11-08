@@ -203,10 +203,9 @@ body {
 .drop-zone {
   border: 2px dashed #94a3b8;
   border-radius: 12px;
-  padding: 24px 16px;
+  padding: 20px 16px;
   text-align: center;
   background-color: #f8fafc;
-  cursor: pointer;
   position: relative;
   transition: all 0.2s ease;
 }
@@ -216,36 +215,92 @@ body {
   background-color: #eff6ff;
 }
 
-.file-input {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-  z-index: 2;
+.file-input-hidden {
+  display: none !important;
 }
 
 .drop-zone-content {
-  pointer-events: none; /* テキストやアイコンがクリック・ドラッグを邪魔しないようにする */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
 }
 
 .drop-icon {
-  font-size: 2.2rem;
+  font-size: 2rem;
   display: block;
-  margin-bottom: 8px;
 }
 
 .drop-text {
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   color: var(--text-main);
-  margin-bottom: 4px;
 }
 
-.drop-subtext {
-  font-size: 0.8rem;
-  color: #64748b;
+.upload-btn-group {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+  width: 100%;
+  margin: 4px 0;
+}
+
+.upload-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: none;
+  user-select: none;
+}
+
+.file-select-btn {
+  background-color: var(--primary-color);
+  color: white;
+  box-shadow: 0 2px 6px rgba(37, 99, 235, 0.25);
+}
+
+.file-select-btn:hover {
+  background-color: var(--primary-dark);
+  transform: translateY(-1px);
+}
+
+.clip-paste-btn {
+  background-color: #059669;
+  color: white;
+  box-shadow: 0 2px 6px rgba(5, 150, 105, 0.25);
+}
+
+.clip-paste-btn:hover {
+  background-color: #047857;
+  transform: translateY(-1px);
+}
+
+.paste-catcher-input {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 0.82rem;
+  text-align: center;
+  color: #334155;
+  background-color: #ffffff;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 6px;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.paste-catcher-input:focus {
+  border-color: var(--primary-color);
+  background-color: #eff6ff;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+  font-weight: 700;
 }
 
 .image-preview-wrapper {
