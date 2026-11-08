@@ -246,9 +246,7 @@ ${customPrompt ? `- 追加指示: ${customPrompt}` : ""}
 }
 `;
 
-    // Gemini API リクエスト（gemini-2.5-flash または gemini-1.5-flash）
-    const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
-
+    // リクエストボディ
     const requestBody = {
       contents: [
         {
@@ -269,15 +267,33 @@ ${customPrompt ? `- 追加指示: ${customPrompt}` : ""}
       }
     };
 
-    const response = await fetch(apiUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(requestBody)
-    });
+    // Gemini API リクエスト（gemini-1.5-flash / gemini-2.0-flash の順で試行）
+    const modelCandidates = ["gemini-1.5-flash", "gemini-2.0-flash"];
+    let response = null;
+    let lastErrorMsg = "";
 
-    if (!response.ok) {
-      const errJson = await response.json().catch(() => ({}));
-      throw new Error(`Gemini API エラー (${response.status}): ${errJson.error?.message || response.statusText}`);
+    for (const model of modelCandidates) {
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      try {
+        const res = await fetch(apiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody)
+        });
+        if (res.ok) {
+          response = res;
+          break;
+        } else {
+          const errJson = await res.json().catch(() => ({}));
+          lastErrorMsg = errJson.error?.message || res.statusText;
+        }
+      } catch (err) {
+        lastErrorMsg = err.message;
+      }
+    }
+
+    if (!response) {
+      throw new Error(`Gemini API エラー: ${lastErrorMsg}`);
     }
 
     const responseData = await response.json();
