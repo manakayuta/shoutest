@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>数学小テストシステム</title>
+  <style>
+/* ========================================================
+   スタイルシート (style.css 内包版)
+   ======================================================== */
+:root {
+  --primary-color: #3b82f6;
+  --primary-dark: #1d4ed8;
+  --success-color: #10b981;
+  --danger-color: #ef4444;
+  --bg-gradient: linear-gradient(135deg, #f0f4f8 0%, #d9e2ec 100%);
+  --card-bg: #ffffff;
+  --text-main: #1e293b;
+  --text-sub: #64748b;
+  --border-color: #e2e8f0;
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.05);
+  --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+  --border-radius: 16px;
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: var(--font-family);
+  background: var(--bg-gradient);
+  color: var(--text-main);
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  position: relative;
+  overflow-x: hidden;
+}
+
+#effectCanvas {
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  pointer-events: none;
+  z-index: 100;
+}
+
+.app-container {
+  width: 100%;
+  max-width: 760px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: relative;
+  z-index: 10;
+}
+
+.app-header { text-align: center; }
+
+.badge {
+  display: inline-block;
+  background-color: #e0e7ff;
+  color: #4338ca;
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 4px 12px;
+  border-radius: 20px;
+  margin-bottom: 6px;
+}
+
+.app-title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.main-card {
+  background: var(--card-bg);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-lg);
+  padding: 28px;
+  min-height: 480px;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+}
+
+.screen { display: none; flex-direction: column; flex: 1; animation: fadeIn 0.3s ease-out forwards; }
+.screen.active { display: flex; }
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 0. 一覧画面 */
+.list-header { margin-bottom: 20px; text-align: center; }
+.list-title { font-size: 1.5rem; font-weight: 800; color: #0f172a; margin-bottom: 6px; }
+.list-subtitle { font-size: 0.95rem; color: var(--text-sub); }
+
+.quiz-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 420px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.quiz-card {
+  background-color: #ffffff;
+  border: 2px solid var(--border-color);
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow-sm);
+}
+
+.quiz-card:hover {
+  border-color: var(--primary-color);
+  background-color: #f8fafc;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.12);
+}
+
+.quiz-card-info { display: flex; align-items: center; gap: 12px; flex: 1; }
+.round-badge {
+  background-color: #eff6ff;
+  color: var(--primary-dark);
+  font-weight: 800;
+  font-size: 0.9rem;
+  padding: 6px 10px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+.quiz-card-title { font-size: 1.1rem; font-weight: 700; color: var(--text-main); }
+.quiz-card-type { font-size: 0.8rem; color: var(--text-sub); background-color: #f1f5f9; padding: 2px 8px; border-radius: 6px; }
+.quiz-card-action { font-weight: 700; color: var(--primary-color); font-size: 0.95rem; display: flex; align-items: center; gap: 4px; }
+
+/* 1. ローディング画面 */
+#loadingScreen { justify-content: center; align-items: center; text-align: center; }
+.spinner-wrapper { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+.spinner {
+  width: 56px; height: 56px;
+  border: 5px solid #e2e8f0;
+  border-top-color: var(--primary-color);
+  border-radius: 50%;
+  animation: spin 0.9s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+}
+.spinner-small {
+  width: 24px; height: 24px;
+  border: 3px solid rgba(255, 255, 255, 0.3);
+  border-top-color: #ffffff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+.loading-text { font-size: 1.1rem; color: var(--text-sub); font-weight: 500; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* 2. 出題画面 */
+.question-top-bar { margin-bottom: 12px; }
+.back-link-btn {
+  background: none; border: none; color: var(--primary-color);
+  font-size: 0.9rem; font-weight: 600; cursor: pointer; padding: 4px 8px; border-radius: 6px;
+}
+.back-link-btn:hover { background-color: #eff6ff; text-decoration: underline; }
+.question-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 16px; padding-bottom: 12px; border-bottom: 2px solid #f1f5f9;
+}
+.question-number { font-size: 1.25rem; font-weight: 800; color: var(--primary-dark); }
+.instruction { font-size: 0.9rem; color: var(--text-sub); }
+
+.image-container {
+  width: 100%; min-height: 220px; max-height: 380px;
+  background-color: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 12px;
+  display: flex; justify-content: center; align-items: center; padding: 16px;
+  margin-bottom: 24px; position: relative; overflow: hidden;
+}
+.image-container img { max-width: 100%; max-height: 340px; object-fit: contain; border-radius: 8px; }
+.image-loader {
+  position: absolute; display: flex; flex-direction: column; align-items: center; gap: 10px;
+  color: var(--text-sub); font-size: 0.9rem; padding: 12px; text-align: center;
+}
+
+.choices-container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+.choice-btn {
+  background-color: #ffffff; border: 2px solid var(--border-color); border-radius: 12px;
+  padding: 16px 20px; font-size: 1.1rem; font-weight: 600; color: var(--text-main);
+  cursor: pointer; display: flex; align-items: center; gap: 12px; transition: all 0.2s ease;
+  box-shadow: var(--shadow-sm); outline: none; user-select: none;
+}
+.choice-index {
+  display: inline-flex; justify-content: center; align-items: center;
+  width: 32px; height: 32px; background-color: #f1f5f9; border-radius: 8px;
+  font-size: 0.95rem; font-weight: 800; color: var(--primary-dark); flex-shrink: 0;
+}
+.choice-text { flex: 1; text-align: left; word-break: break-word; }
+.choice-btn:hover:not(:disabled) {
+  border-color: var(--primary-color); background-color: #eff6ff;
+  transform: translateY(-2px); box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+.choice-btn:hover:not(:disabled) .choice-index { background-color: var(--primary-color); color: #ffffff; }
+.choice-btn:disabled { cursor: not-allowed; opacity: 0.65; }
+.choice-btn.selected { border-color: var(--primary-color); background-color: #dbeafe; }
+
+.submitting-overlay {
+  position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(2px); border-radius: var(--border-radius);
+  display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 12px;
+  color: #ffffff; font-size: 1.1rem; font-weight: 700; z-index: 50;
+}
+.submitting-overlay.hidden { display: none; }
+
+/* 3. 結果画面 */
+#resultScreen { justify-content: center; align-items: center; }
+.result-card { text-align: center; max-width: 480px; width: 100%; margin: auto; padding: 10px; }
+.result-icon-wrapper { margin-bottom: 16px; display: inline-block; }
+.result-icon { font-size: 4.5rem; display: inline-block; animation: popScale 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+@keyframes popScale {
+  0% { transform: scale(0) rotate(-20deg); }
+  60% { transform: scale(1.3) rotate(10deg); }
+  100% { transform: scale(1) rotate(0deg); }
+}
+.shake { animation: shakeAnimation 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; }
+@keyframes shakeAnimation {
+  10%, 90% { transform: translate3d(-3px, 0, 0); }
+  20%, 80% { transform: translate3d(5px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-6px, 0, 0); }
+  40%, 60% { transform: translate3d(6px, 0, 0); }
+}
+.result-title { font-size: 2.2rem; font-weight: 900; margin-bottom: 8px; }
+.result-title.correct { color: var(--success-color); }
+.result-title.incorrect { color: var(--danger-color); }
+.result-message { font-size: 1.1rem; color: var(--text-sub); margin-bottom: 24px; }
+.answer-detail {
+  background-color: #f8fafc; border-radius: 12px; padding: 12px 20px;
+  display: inline-flex; gap: 10px; align-items: center; margin-bottom: 24px;
+  border: 1px solid var(--border-color);
+}
+.detail-label { font-size: 0.95rem; color: var(--text-sub); font-weight: 600; }
+.detail-value { font-size: 1.1rem; font-weight: 800; color: var(--primary-dark); }
+.next-step-box { background-color: #f1f5f9; border-radius: 12px; padding: 16px; font-size: 0.95rem; margin-bottom: 24px; }
+.next-step-box .sub-text { font-size: 0.85rem; color: var(--text-sub); margin-top: 4px; }
+.result-actions { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+.retry-btn {
+  background: transparent; border: 1px dashed var(--text-sub); color: var(--text-sub);
+  padding: 8px 16px; border-radius: 8px; font-size: 0.85rem; cursor: pointer;
+}
+.retry-btn:hover { background: #f1f5f9; color: var(--text-main); }
+.primary-btn {
+  background-color: var(--primary-color); color: white; border: none; border-radius: 10px;
+  padding: 12px 28px; font-size: 1.05rem; font-weight: 700; cursor: pointer;
+  box-shadow: 0 4px 10px rgba(59, 130, 246, 0.2); transition: all 0.2s ease;
+}
+.primary-btn:hover { background-color: var(--primary-dark); transform: translateY(-1px); }
+
+/* エラー画面 */
+.error-box { text-align: center; margin: auto; padding: 20px; }
+.error-icon { font-size: 3rem; display: block; margin-bottom: 12px; }
+.error-box h3 { font-size: 1.3rem; color: var(--danger-color); margin-bottom: 8px; }
+.error-box p { color: var(--text-sub); margin-bottom: 20px; }
+
+@media (max-width: 600px) {
+  .choices-container { grid-template-columns: 1fr; }
+  .main-card { padding: 18px; }
+  .quiz-card { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .quiz-card-action { align-self: flex-end; }
+}
+  </style>
+</head>
+<body>
+  <canvas id="effectCanvas"></canvas>
+
+  <div class="app-container">
+    <header class="app-header">
+      <div class="badge">数学 授業前チェック</div>
+      <h1 class="app-title">数学小テストシステム</h1>
+    </header>
+
+    <main class="main-card">
+      <!-- 0. 小テスト一覧画面 -->
+      <section id="listScreen" class="screen">
+        <div class="list-header">
+          <h2 class="list-title">小テスト一覧</h2>
+          <p class="list-subtitle">受ける小テストを選んでください（過去の復習も可能です）</p>
+        </div>
+        <div id="quizListContainer" class="quiz-list-container"></div>
+      </section>
+
+      <!-- 1. ローディング画面 -->
+      <section id="loadingScreen" class="screen active">
+        <div class="spinner-wrapper">
+          <div class="spinner"></div>
+          <p id="loadingMessage" class="loading-text">データを読み込んでいます...</p>
+        </div>
+      </section>
+
+      <!-- 2. 出題画面 -->
+      <section id="questionScreen" class="screen">
+        <div class="question-top-bar">
+          <button id="backToListFromQuestionBtn" class="back-link-btn" type="button">← テスト一覧に戻る</button>
+        </div>
+        <div class="question-header">
+          <span class="question-number" id="questionNumber">問題</span>
+          <span class="instruction">正しい選択肢を1つ選んでください</span>
+        </div>
+
+        <div class="image-container">
+          <img id="questionImage" src="" alt="問題の数式" loading="eager">
+          <div id="imageLoader" class="image-loader">
+            <div class="spinner-small"></div>
+            <span>画像を読み込み中...</span>
+          </div>
+        </div>
+
+        <div class="choices-container" id="choicesContainer"></div>
+
+        <div id="submittingOverlay" class="submitting-overlay hidden">
+          <div class="spinner-small"></div>
+          <span>解答を送信中...</span>
+        </div>
+      </section>
+
+      <!-- 3. 結果画面 -->
+      <section id="resultScreen" class="screen">
+        <div class="result-card" id="resultCard">
+          <div class="result-icon-wrapper" id="resultIconWrapper">
+            <span id="resultIcon" class="result-icon">🎉</span>
+          </div>
+          <h2 id="resultTitle" class="result-title">正解！</h2>
+          <p id="resultMessage" class="result-message">素晴らしい！しっかり復習できていますね。</p>
+
+          <div class="answer-detail">
+            <span class="detail-label">正解:</span>
+            <span id="correctAnswerText" class="detail-value">選択肢B</span>
+          </div>
+
+          <div class="next-step-box">
+            <p>解答が記録されました。</p>
+            <p class="sub-text">画面をそのままにして先生の指示を待ってください。</p>
+          </div>
+
+          <div class="result-actions">
+            <button id="backToListFromResultBtn" class="primary-btn">小テスト一覧に戻る</button>
+            <button id="retryBtn" class="retry-btn">この問題をもう一度解く</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- エラー画面 -->
+      <section id="errorScreen" class="screen">
+        <div class="error-box">
+          <span class="error-icon">⚠️</span>
+          <h3>データの取得に失敗しました</h3>
+          <p id="errorMessage">ネットワーク環境を確認してください。</p>
+          <button id="reloadBtn" class="primary-btn">再読み込み</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script>
+/**
+ * ========================================================
+ * アプリケーションロジック (GAS内部完全統合版)
+ * ========================================================
+ */
+const screens = {
+  list: document.getElementById("listScreen"),
+  loading: document.getElementById("loadingScreen"),
+  question: document.getElementById("questionScreen"),
+  result: document.getElementById("resultScreen"),
+  error: document.getElementById("errorScreen")
+};
+
+const loadingMessageEl = document.getElementById("loadingMessage");
+const quizListContainerEl = document.getElementById("quizListContainer");
+const backToListFromQuestionBtnEl = document.getElementById("backToListFromQuestionBtn");
+const backToListFromResultBtnEl = document.getElementById("backToListFromResultBtn");
+const questionNumberEl = document.getElementById("questionNumber");
+const questionImageEl = document.getElementById("questionImage");
+const imageLoaderEl = document.getElementById("imageLoader");
+const choicesContainerEl = document.getElementById("choicesContainer");
+const submittingOverlayEl = document.getElementById("submittingOverlay");
+
+const resultCardEl = document.getElementById("resultCard");
+const resultIconEl = document.getElementById("resultIcon");
+const resultTitleEl = document.getElementById("resultTitle");
+const resultMessageEl = document.getElementById("resultMessage");
+const correctAnswerTextEl = document.getElementById("correctAnswerText");
+const retryBtnEl = document.getElementById("retryBtn");
+const reloadBtnEl = document.getElementById("reloadBtn");
+const errorMessageEl = document.getElementById("errorMessage");
+
+let currentQuestion = null;
+
+function switchScreen(targetScreenName) {
+  Object.keys(screens).forEach((name) => {
+    if (name === targetScreenName) {
+      screens[name].classList.add("active");
+    } else {
+      screens[name].classList.remove("active");
+    }
+  });
+}
+
+// 1. 小テスト一覧の取得 (google.script.run)
+function fetchQuestionList() {
+  loadingMessageEl.textContent = "小テスト一覧を読み込んでいます...";
+  switchScreen("loading");
+
+  if (typeof google !== "undefined" && google.script && google.script.run) {
+    google.script.run
+      .withSuccessHandler(renderQuestionList)
+      .withFailureHandler((err) => {
+        errorMessageEl.textContent = `小テスト一覧の取得エラー: ${err.message}`;
+        switchScreen("error");
+      })
+      .getQuestionListServer();
+  } else {
+    // デモ用フォールバック
+    renderQuestionList([
+      { questionId: "q001", round: "第1回", title: "2次関数の頂点", type: "4択" }
+    ]);
+  }
+}
+
+// 2. 問題データの取得
+function fetchQuestion(questionId) {
+  loadingMessageEl.textContent = "問題を読み込んでいます...";
+  switchScreen("loading");
+
+  if (typeof google !== "undefined" && google.script && google.script.run) {
+    google.script.run
+      .withSuccessHandler(renderQuestion)
+      .withFailureHandler((err) => {
+        errorMessageEl.textContent = `問題の取得エラー: ${err.message}`;
+        switchScreen("error");
+      })
+      .getQuestionServer(questionId);
+  }
+}
+
+// 3. 解答送信
+function submitAnswer(selectedChoice) {
+  submittingOverlayEl.classList.remove("hidden");
+  const buttons = choicesContainerEl.querySelectorAll("button");
+  buttons.forEach(btn => btn.disabled = true);
+
+  if (typeof google !== "undefined" && google.script && google.script.run) {
+    google.script.run
+      .withSuccessHandler(renderResult)
+      .withFailureHandler((err) => {
+        alert(`解答送信エラー: ${err.message}`);
+        submittingOverlayEl.classList.add("hidden");
+        buttons.forEach(btn => btn.disabled = false);
+      })
+      .submitAnswerServer(currentQuestion.questionId, selectedChoice);
+  }
+}
+
+// 4. 一覧描画
+function renderQuestionList(questions) {
+  quizListContainerEl.innerHTML = "";
+
+  if (!questions || questions.length === 0) {
+    quizListContainerEl.innerHTML = `
+      <div style="text-align: center; padding: 40px 20px; color: #64748b;">
+        <p style="font-size: 1.1rem; font-weight: 600;">現在、公開中の小テストはありません。</p>
+      </div>
+    `;
+    switchScreen("list");
+    return;
+  }
+
+  questions.forEach((q) => {
+    const card = document.createElement("div");
+    card.className = "quiz-card";
+    card.innerHTML = `
+      <div class="quiz-card-info">
+        <span class="round-badge">${escapeHtml(q.round || "小テスト")}</span>
+        <span class="quiz-card-title">${escapeHtml(q.title || "")}</span>
+        <span class="quiz-card-type">${escapeHtml(q.type || "4択")}</span>
+      </div>
+      <div class="quiz-card-action">
+        <span>挑戦する</span>
+        <span>➔</span>
+      </div>
+    `;
+    card.addEventListener("click", () => fetchQuestion(q.questionId));
+    quizListContainerEl.appendChild(card);
+  });
+
+  switchScreen("list");
+}
+
+// 5. 出題描画
+function renderQuestion(questionData) {
+  currentQuestion = questionData;
+  questionNumberEl.textContent = questionData.questionTitle || questionData.round || "小テスト";
+
+  if (!questionData.imageUrl || questionData.imageUrl.trim() === "") {
+    imageLoaderEl.style.display = "flex";
+    imageLoaderEl.innerHTML = `<span style="color:#64748b; font-size:1rem; font-weight:500;">📝 （問題画像は未設定です）</span>`;
+    questionImageEl.style.display = "none";
+  } else {
+    questionImageEl.style.display = "block";
+    imageLoaderEl.style.display = "flex";
+    imageLoaderEl.innerHTML = `<div class="spinner-small"></div><span>画像を読み込み中...</span>`;
+    questionImageEl.style.opacity = "0";
+
+    questionImageEl.onload = () => {
+      imageLoaderEl.style.display = "none";
+      questionImageEl.style.opacity = "1";
+    };
+    questionImageEl.onerror = () => {
+      imageLoaderEl.innerHTML = `<span style="color:#ef4444;">画像の読み込みに失敗しました（Googleドライブの共有設定を確認してください）</span>`;
+    };
+    questionImageEl.src = questionData.imageUrl;
+  }
+
+  choicesContainerEl.innerHTML = "";
+  const choiceLabels = ["A", "B", "C", "D"];
+
+  questionData.choices.forEach((choiceText, index) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "choice-btn";
+
+    const labelSpan = document.createElement("span");
+    labelSpan.className = "choice-index";
+    labelSpan.textContent = choiceLabels[index] || (index + 1);
+
+    const textSpan = document.createElement("span");
+    textSpan.className = "choice-text";
+    textSpan.textContent = choiceText;
+
+    btn.appendChild(labelSpan);
+    btn.appendChild(textSpan);
+
+    btn.addEventListener("click", () => {
+      btn.classList.add("selected");
+      submitAnswer(choiceText);
+    });
+
+    choicesContainerEl.appendChild(btn);
+  });
+
+  submittingOverlayEl.classList.add("hidden");
+  switchScreen("question");
+}
+
+// 6. 結果描画
+function renderResult(result) {
+  submittingOverlayEl.classList.add("hidden");
+  switchScreen("result");
+
+  const isCorrect = result.isCorrect;
+  correctAnswerTextEl.textContent = result.correctAnswer || "";
+  resultCardEl.classList.remove("shake");
+
+  if (isCorrect) {
+    resultIconEl.textContent = "🎉";
+    resultTitleEl.textContent = "正解！お見事！";
+    resultTitleEl.className = "result-title correct";
+    resultMessageEl.textContent = "バッチリ理解できています！本日の授業もこの調子でいきましょう！";
+    fireConfettiExplosion();
+  } else {
+    resultIconEl.textContent = "💪";
+    resultTitleEl.textContent = "惜しい！不正解…";
+    resultTitleEl.className = "result-title incorrect";
+    resultMessageEl.textContent = "間違えたところは絶好の学びのチャンス！解説を確認しましょう。";
+    resultCardEl.classList.add("shake");
+    fireRippleEffect();
+  }
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+}
+
+// 7. キャンバス演出
+const canvas = document.getElementById("effectCanvas");
+const ctx = canvas.getContext("2d");
+let particles = [];
+let animationFrameId = null;
+
+function resizeCanvas() { canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+window.addEventListener("resize", resizeCanvas);
+resizeCanvas();
+
+class Particle {
+  constructor(x, y, color, type = "confetti") {
+    this.x = x; this.y = y; this.color = color; this.type = type;
+    const angle = Math.random() * Math.PI * 2;
+    const speed = (Math.random() * 12 + 6);
+    this.vx = Math.cos(angle) * speed;
+    this.vy = Math.sin(angle) * speed - (type === "confetti" ? 6 : 2);
+    this.gravity = 0.28; this.friction = 0.985;
+    this.size = Math.random() * 8 + 6;
+    this.rotation = Math.random() * 360;
+    this.rotationSpeed = (Math.random() - 0.5) * 12;
+    this.opacity = 1; this.fadeSpeed = Math.random() * 0.008 + 0.006;
+  }
+  update() {
+    this.vx *= this.friction; this.vy *= this.friction; this.vy += this.gravity;
+    this.x += this.vx; this.y += this.vy;
+    this.rotation += this.rotationSpeed; this.opacity -= this.fadeSpeed;
+  }
+  draw(context) {
+    if (this.opacity <= 0) return;
+    context.save();
+    context.globalAlpha = Math.max(this.opacity, 0);
+    context.translate(this.x, this.y);
+    context.rotate((this.rotation * Math.PI) / 180);
+    context.fillStyle = this.color;
+    if (this.type === "confetti") {
+      context.fillRect(-this.size / 2, -this.size / 4, this.size, this.size / 2);
+    } else {
+      context.beginPath(); context.arc(0, 0, this.size / 2, 0, Math.PI * 2); context.fill();
+    }
+    context.restore();
+  }
+}
+
+function runParticleLoop() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.update(); p.draw(ctx);
+    if (p.opacity <= 0 || p.y > canvas.height + 50) particles.splice(i, 1);
+  }
+  if (particles.length > 0) animationFrameId = requestAnimationFrame(runParticleLoop);
+  else { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
+}
+
+function fireConfettiExplosion() {
+  const colors = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6", "#ec4899", "#06b6d4"];
+  const centerX = window.innerWidth / 2; const centerY = window.innerHeight / 2 - 50;
+  for (let i = 0; i < 120; i++) particles.push(new Particle(centerX, centerY, colors[Math.floor(Math.random() * colors.length)], "confetti"));
+  if (!animationFrameId) runParticleLoop();
+}
+
+function fireRippleEffect() {
+  const colors = ["#60a5fa", "#93c5fd", "#cbd5e1"];
+  const centerX = window.innerWidth / 2; const centerY = window.innerHeight / 2;
+  for (let i = 0; i < 40; i++) particles.push(new Particle(centerX, centerY, colors[Math.floor(Math.random() * colors.length)], "circle"));
+  if (!animationFrameId) runParticleLoop();
+}
+
+// イベントリスナー
+backToListFromQuestionBtnEl.addEventListener("click", fetchQuestionList);
+backToListFromResultBtnEl.addEventListener("click", fetchQuestionList);
+retryBtnEl.addEventListener("click", () => {
+  if (currentQuestion) fetchQuestion(currentQuestion.questionId);
+  else fetchQuestionList();
+});
+reloadBtnEl.addEventListener("click", fetchQuestionList);
+
+// 起動
+window.addEventListener("DOMContentLoaded", fetchQuestionList);
+  </script>
+</body>
+</html>
