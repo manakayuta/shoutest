@@ -1,7 +1,7 @@
 // ========================================================
-// 数学小テスト 問題作成スタジオ ロジック v3.2 (creator.js)
+// 数学小テスト 問題作成スタジオ ロジック v3.3 (creator.js)
 // GAS (HtmlService iframe) / ローカル両対応・完全版
-// 生徒用画面 (index.html) と同一の純粋ES構文・テンプレートリテラル排除版
+// 生徒用画面 (index.html) と同一の純粋ES構文・タイムアウト＆サーバー中継フォールバック対応
 // ========================================================
 
 const STORAGE_KEY_API = "quick_quiz_gemini_api_key";
@@ -14,6 +14,10 @@ let isAppInitialized = false;
 let dragDepth = 0;
 let lastHandledPasteEvent = null;
 let assetsLoadingStarted = false;
+let activeGenerateToken = 0;
+let activeAbortController = null;
+let loadingTimerId = null;
+let loadingStartTime = 0;
 
 function el(id) {
   return document.getElementById(id);
@@ -92,7 +96,7 @@ function resetPasteBoxState() {
     box.classList.remove("paste-ready");
     box.setAttribute("data-placeholder", "💡 ここをクリックして Ctrl + V（または右クリック→貼り付け）");
   }
-  setPasteStatus("🟢 動作準備OK (v3.2) — ファイル選択 / D&D / Ctrl+V すべて対応", "ready");
+  setPasteStatus("🟢 動作準備OK (v3.3) — ファイル選択 / D&D / Ctrl+V すべて対応", "ready");
 }
 
 // ==========================================
@@ -246,6 +250,7 @@ function initCreatorApp() {
     const toggleApiVisibilityBtn = el("toggleApiVisibilityBtn");
     const driveFolderUrlInput = el("driveFolderUrlInput");
     const generateBtn = el("generateBtn");
+    const cancelGenerateBtn = el("cancelGenerateBtn");
     const exportBtn = el("exportBtn");
     const manualCopyBtn = el("manualCopyBtn");
 
@@ -364,6 +369,9 @@ function initCreatorApp() {
     if (generateBtn) {
       generateBtn.addEventListener("click", handleGenerateClick);
     }
+    if (cancelGenerateBtn) {
+      cancelGenerateBtn.addEventListener("click", handleCancelGenerateClick);
+    }
     if (exportBtn) {
       exportBtn.addEventListener("click", handleExportClick);
     }
@@ -371,8 +379,8 @@ function initCreatorApp() {
       manualCopyBtn.addEventListener("click", handleManualCopyClick);
     }
 
-    setVersionBadge("教員用ツール v3.2 (🟢 動作準備OK)", "badge-ready");
-    setPasteStatus("🟢 動作準備OK (v3.2) — ファイル選択 / D&D / Ctrl+V すべて対応", "ready");
+    setVersionBadge("教員用ツール v3.3 (🟢 動作準備OK)", "badge-ready");
+    setPasteStatus("🟢 動作準備OK (v3.3) — ファイル選択 / D&D / Ctrl+V すべて対応", "ready");
 
     // ブラウザの遅延自動入力（オートフィル）対策
     [300, 1000, 2500].forEach(function (delay) {
@@ -384,7 +392,7 @@ function initCreatorApp() {
   } catch (err) {
     const msg = err && err.message ? err.message : String(err);
     console.error("Creator init error:", err);
-    setVersionBadge("教員用ツール v3.2 (🔴 起動エラー: " + msg + ")", "badge-error");
+    setVersionBadge("教員用ツール v3.3 (🔴 起動エラー: " + msg + ")", "badge-error");
     setPasteStatus("🔴 起動エラー: " + msg, "error");
   }
 }
@@ -392,7 +400,7 @@ function initCreatorApp() {
 window.addEventListener("error", function (e) {
   if (!isAppInitialized) {
     const msg = (e && e.message) ? e.message : "不明なエラー";
-    setVersionBadge("教員用ツール v3.2 (🔴 エラー: " + msg + ")", "badge-error");
+    setVersionBadge("教員用ツール v3.3 (🔴 エラー: " + msg + ")", "badge-error");
     setPasteStatus("🔴 エラー: " + msg, "error");
   }
 });
@@ -679,30 +687,297 @@ function checkReadyToGenerate() {
 }
 
 // ==========================================
-// 3. Gemini API による解析・改題・生成
+// 3. Gemini API による解析・改題・生成（タイムアウト + 画像最適化 + GASサーバー中継対応）
 // ==========================================
-function callGeminiWithFallback(modelCandidates, idx, apiKey, requestBody, lastErrorMsg) {
-  if (idx >= modelCandidates.length) {
-    return Promise.reject(new Error("Gemini API エラー: " + (lastErrorMsg || "不明なエラー")));
+function stopLoadingTimer() {
+  if (loadingTimerId !== null) {
+    clearInterval(loadingTimerId);
+    loadingTimerId = null;
   }
+}
+
+function startLoadingTimer() {
+  stopLoadingTimer();
+  loadingStartTime = Date.now();
+  const elapsedEl = el("loadingElapsedText");
+  if (elapsedEl) elapsedEl.textContent = "経過時間: 0秒";
+  loadingTimerId = setInterval(function () {
+    const sec = Math.floor((Date.now() - loadingStartTime) / 1000);
+    const target = el("loadingElapsedText");
+    if (target) target.textContent = "経過時間: " + sec + "秒";
+  }, 1000);
+}
+
+function hideGenerateError() {
+  const errBox = el("generateErrorBox");
+  if (errBox) {
+    errBox.innerHTML = "";
+    errBox.classList.add("hidden");
+  }
+}
+
+function showGenerateError(detailMsg, hintMsg) {
+  const errBox = el("generateErrorBox");
+  if (!errBox) {
+    alert(detailMsg);
+    return;
+  }
+  errBox.innerHTML = "";
+
+  const titleEl = document.createElement("div");
+  titleEl.className = "generate-error-title";
+  titleEl.textContent = "⚠️ AI生成に失敗しました";
+  errBox.appendChild(titleEl);
+
+  const detailEl = document.createElement("div");
+  detailEl.className = "generate-error-detail";
+  detailEl.textContent = detailMsg;
+  errBox.appendChild(detailEl);
+
+  if (hintMsg) {
+    const hintEl = document.createElement("div");
+    hintEl.className = "generate-error-hint";
+    hintEl.textContent = hintMsg;
+    errBox.appendChild(hintEl);
+  }
+
+  errBox.classList.remove("hidden");
+}
+
+function handleCancelGenerateClick() {
+  activeGenerateToken++;
+  if (activeAbortController) {
+    try { activeAbortController.abort(); } catch (e) {}
+    activeAbortController = null;
+  }
+  stopLoadingTimer();
+  const loadingBox = el("loadingBox");
+  const placeholderBox = el("placeholderBox");
+  const generateBtn = el("generateBtn");
+  if (loadingBox) loadingBox.classList.add("hidden");
+  if (placeholderBox) placeholderBox.classList.remove("hidden");
+  if (generateBtn) generateBtn.disabled = false;
+  checkReadyToGenerate();
+}
+
+function optimizeImageForGemini(dataUrl) {
+  if (!dataUrl || typeof Image !== "function") {
+    return Promise.resolve(dataUrl);
+  }
+  return new Promise(function (resolve) {
+    let settled = false;
+    const done = function (resultUrl) {
+      if (settled) return;
+      settled = true;
+      resolve(resultUrl || dataUrl);
+    };
+
+    const guardTimer = setTimeout(function () { done(dataUrl); }, 2500);
+
+    try {
+      const img = new Image();
+      img.onload = function () {
+        clearTimeout(guardTimer);
+        try {
+          const w = img.naturalWidth || img.width || 0;
+          const h = img.naturalHeight || img.height || 0;
+          const maxDim = 1600;
+          const needsResize = (w > maxDim || h > maxDim);
+          const isHuge = dataUrl.length > 900000;
+
+          if (!needsResize && !isHuge) {
+            done(dataUrl);
+            return;
+          }
+
+          let targetW = w || 1200;
+          let targetH = h || 900;
+          if (needsResize) {
+            const scale = Math.min(maxDim / w, maxDim / h);
+            targetW = Math.max(1, Math.round(w * scale));
+            targetH = Math.max(1, Math.round(h * scale));
+          }
+
+          const canvas = document.createElement("canvas");
+          canvas.width = targetW;
+          canvas.height = targetH;
+          const ctx = canvas.getContext("2d");
+          if (!ctx) {
+            done(dataUrl);
+            return;
+          }
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, targetW, targetH);
+          ctx.drawImage(img, 0, 0, targetW, targetH);
+          const compressed = canvas.toDataURL("image/jpeg", 0.9);
+          if (compressed && compressed.startsWith("data:image/") && compressed.length < dataUrl.length) {
+            done(compressed);
+          } else {
+            done(dataUrl);
+          }
+        } catch (e) {
+          done(dataUrl);
+        }
+      };
+      img.onerror = function () {
+        clearTimeout(guardTimer);
+        done(dataUrl);
+      };
+      img.src = dataUrl;
+    } catch (e) {
+      clearTimeout(guardTimer);
+      done(dataUrl);
+    }
+  });
+}
+
+function fetchWithTimeout(url, options, timeoutMs) {
+  return new Promise(function (resolve, reject) {
+    let finished = false;
+    let controller = null;
+    if (typeof AbortController === "function") {
+      try { controller = new AbortController(); } catch (e) {}
+    }
+    activeAbortController = controller;
+
+    const timer = setTimeout(function () {
+      if (finished) return;
+      finished = true;
+      if (controller) {
+        try { controller.abort(); } catch (e) {}
+      }
+      const err = new Error("通信がタイムアウトしました（" + Math.round(timeoutMs / 1000) + "秒）");
+      err.isNetworkOrTimeout = true;
+      reject(err);
+    }, timeoutMs);
+
+    const fetchOpts = Object.assign({}, options);
+    if (controller && controller.signal) {
+      fetchOpts.signal = controller.signal;
+    }
+
+    fetch(url, fetchOpts).then(function (res) {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      resolve(res);
+    }).catch(function (err) {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      const wrapped = err instanceof Error ? err : new Error(String(err));
+      wrapped.isNetworkOrTimeout = true;
+      reject(wrapped);
+    });
+  });
+}
+
+function callGeminiViaGasServer(apiKey, requestBody, token) {
+  if (typeof google === "undefined" || !google.script || !google.script.run) {
+    return Promise.reject(new Error("GASサーバー環境ではありません"));
+  }
+  return new Promise(function (resolve, reject) {
+    let settled = false;
+    const serverTimer = setTimeout(function () {
+      if (settled) return;
+      settled = true;
+      reject(new Error("GASサーバー経由のAI応答もタイムアウトしました（45秒）。画像サイズを小さくするか、少し時間をおいて再試行してください。"));
+    }, 45000);
+
+    try {
+      google.script.run
+        .withSuccessHandler(function (res) {
+          if (settled) return;
+          settled = true;
+          clearTimeout(serverTimer);
+          if (token !== activeGenerateToken) {
+            reject(new Error("CANCELLED"));
+            return;
+          }
+          resolve(res);
+        })
+        .withFailureHandler(function (err) {
+          if (settled) return;
+          settled = true;
+          clearTimeout(serverTimer);
+          const msg = (err && err.message) ? err.message : String(err);
+          const wrapped = new Error(msg);
+          if (msg.indexOf("generateQuizServer") !== -1 || msg.indexOf("is not a function") !== -1) {
+            wrapped.isMissingServerFn = true;
+          }
+          reject(wrapped);
+        })
+        .generateQuizServer(apiKey, requestBody);
+    } catch (err) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(serverTimer);
+      reject(err);
+    }
+  });
+}
+
+function callGeminiWithFallback(modelCandidates, idx, apiKey, requestBody, lastErrorMsg, token, statusEl) {
+  if (token !== activeGenerateToken) {
+    return Promise.reject(new Error("CANCELLED"));
+  }
+  if (idx >= modelCandidates.length) {
+    return Promise.reject(new Error("Gemini API エラー: " + (lastErrorMsg || "利用可能なモデルが見つかりませんでした。")));
+  }
+
   const model = modelCandidates[idx];
   const apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(apiKey);
+  if (statusEl) {
+    statusEl.textContent = "AI (" + model + ") が画像を解析中...（" + (idx + 1) + "/" + modelCandidates.length + "）";
+  }
 
-  return fetch(apiUrl, {
+  return fetchWithTimeout(apiUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(requestBody)
-  }).then(function (res) {
+  }, 25000).then(function (res) {
+    if (token !== activeGenerateToken) {
+      throw new Error("CANCELLED");
+    }
     if (res.ok) {
       return res.json();
     }
     return res.json().catch(function () { return {}; }).then(function (errJson) {
-      const msg = (errJson && errJson.error && errJson.error.message) ? errJson.error.message : res.statusText;
-      return callGeminiWithFallback(modelCandidates, idx + 1, apiKey, requestBody, msg);
+      const apiMsg = (errJson && errJson.error && errJson.error.message) ? errJson.error.message : (res.statusText || "Error");
+      const statusMsg = "HTTP " + res.status + ": " + apiMsg;
+      if (res.status === 400 || res.status === 401 || res.status === 403 || res.status === 429) {
+        const fatal = new Error("Gemini API エラー (" + statusMsg + ")");
+        fatal.httpStatus = res.status;
+        fatal.isFatalApiError = true;
+        throw fatal;
+      }
+      return callGeminiWithFallback(modelCandidates, idx + 1, apiKey, requestBody, statusMsg, token, statusEl);
     });
   }).catch(function (err) {
+    if (token !== activeGenerateToken || (err && err.message === "CANCELLED")) {
+      throw new Error("CANCELLED");
+    }
+    if (err && err.isFatalApiError) {
+      throw err;
+    }
+    if (err && err.isNetworkOrTimeout) {
+      if (typeof google !== "undefined" && google.script && google.script.run) {
+        if (statusEl) {
+          statusEl.textContent = "直接通信が混み合っているため、GASサーバー経由でAIへ再接続しています...";
+        }
+        return callGeminiViaGasServer(apiKey, requestBody, token).catch(function (gasErr) {
+          if (gasErr && gasErr.isMissingServerFn) {
+            const combined = new Error(err.message + "（学校ネットワーク等でブラウザからGeminiへの直接通信が遮断/遅延している可能性があります）");
+            combined.needsGasCodeUpdate = true;
+            throw combined;
+          }
+          throw gasErr;
+        });
+      }
+      throw err;
+    }
     const msg = err && err.message ? err.message : String(err);
-    return callGeminiWithFallback(modelCandidates, idx + 1, apiKey, requestBody, msg);
+    return callGeminiWithFallback(modelCandidates, idx + 1, apiKey, requestBody, msg, token, statusEl);
   });
 }
 
@@ -729,124 +1004,168 @@ function handleGenerateClick() {
     return;
   }
 
-  const remakeRadio = document.querySelector('input[name="remakeMode"]:checked');
-  const typeRadio = document.querySelector('input[name="questionType"]:checked');
-  const remakeMode = remakeRadio ? remakeRadio.value : "exact";
-  const questionType = typeRadio ? typeRadio.value : "マーク";
-  const customPrompt = customPromptInput ? customPromptInput.value.trim() : "";
+  const myToken = ++activeGenerateToken;
+  hideGenerateError();
 
-  if (placeholderBox) placeholderBox.classList.add("hidden");
-  if (resultArea) resultArea.classList.add("hidden");
-  if (loadingBox) loadingBox.classList.remove("hidden");
-  if (copySuccessMessage) copySuccessMessage.classList.add("hidden");
-  if (exportWarningMessage) exportWarningMessage.classList.add("hidden");
-  if (manualCopyBox) manualCopyBox.classList.add("hidden");
-  if (generateBtn) generateBtn.disabled = true;
-  if (loadingStatusText) loadingStatusText.textContent = "AIが画像を解析し、数式と問題を構成しています...";
+  try {
+    const remakeRadio = document.querySelector('input[name="remakeMode"]:checked');
+    const typeRadio = document.querySelector('input[name="questionType"]:checked');
+    const remakeMode = remakeRadio ? remakeRadio.value : "exact";
+    const questionType = typeRadio ? typeRadio.value : "マーク";
+    const customPrompt = customPromptInput ? customPromptInput.value.trim() : "";
 
-  const mimeType = currentImageBase64.split(";")[0].split(":")[1];
-  const base64Data = currentImageBase64.split(",")[1];
+    if (placeholderBox) placeholderBox.classList.add("hidden");
+    if (resultArea) resultArea.classList.add("hidden");
+    if (loadingBox) loadingBox.classList.remove("hidden");
+    if (copySuccessMessage) copySuccessMessage.classList.add("hidden");
+    if (exportWarningMessage) exportWarningMessage.classList.add("hidden");
+    if (manualCopyBox) manualCopyBox.classList.add("hidden");
+    if (generateBtn) generateBtn.disabled = true;
+    if (loadingStatusText) loadingStatusText.textContent = "画像を最適化してAIへ送信準備をしています...";
+    startLoadingTimer();
 
-  const systemPrompt = [
-    "あなたは日本の高校数学の優秀な教員であり教材作成のスペシャリストです。",
-    "添付された数学の問題画像を読み取り、指定されたルールに従って小テスト用データをJSON形式で出力してください。",
-    "",
-    "【設定条件】",
-    "- 改題モード: " + (remakeMode === "exact" ? "元画像の問題をできるだけ忠実に再現（マーク化/選択肢化のみ行う）" : "元画像の問題を改題（数値を変更した類題を作成）"),
-    "- 出題形式: " + questionType + "（マーク式または選択式）",
-    customPrompt ? ("- 追加指示: " + customPrompt) : "",
-    "",
-    "【数学・表記ルール】",
-    "1. 数式はすべて LaTeX 記法（$ ... $ または $$ ... $$）で美しく記述してください。",
-    "2. マーク式の場合:",
-    "   - 問題文中に穴埋め枠として \\fbox{ ア } や \\fbox{ イ } のようにマーク枠を配置してください。",
-    "   - slotsOrChoices には [\"ア\", \"イ\"] のように使用したマーク枠のカタカナ文字を配列で入れてください。",
-    "   - correctAnswer には \"1, 2\" や \"-, 3\" のようにカンマ区切りで各枠の正解を入れてください。",
-    "3. 選択式の場合:",
-    "   - slotsOrChoices には [\"選択肢Aのテキスト\", \"選択肢Bのテキスト\", \"選択肢Cのテキスト\", \"選択肢Dのテキスト\"] を入れてください（2〜4択）。",
-    "   - correctAnswer には正解の文字（\"A\", \"B\", \"C\", \"D\" のいずれか）を入れてください。",
-    "4. explanationMarkdown には、生徒が読んですぐ理解できる丁寧な途中式とポイント解説を LaTeX を交えて記述してください。",
-    "",
-    "【出力フォーマット】",
-    "以下のJSONフォーマットのみを純粋に出力してください（コードブロック記号は含めないでください）。",
-    "{",
-    "  \"title\": \"単元名・問題タイトル（例: 第◯回 2次関数の決定）\",",
-    "  \"problemMarkdown\": \"問題文の本文（LaTeX数式記法を含む）\",",
-    "  \"type\": \"" + questionType + "\",",
-    "  \"slotsOrChoices\": [\"ア\", \"イ\"],",
-    "  \"correctAnswer\": \"1, 2\",",
-    "  \"explanationMarkdown\": \"解説本文（LaTeX数式記法を含む）\"",
-    "}"
-  ].join("\n");
+    optimizeImageForGemini(currentImageBase64)
+      .then(function (optimizedDataUrl) {
+        if (myToken !== activeGenerateToken) {
+          throw new Error("CANCELLED");
+        }
 
-  const requestBody = {
-    contents: [
-      {
-        parts: [
-          { text: systemPrompt },
-          {
-            inline_data: {
-              mime_type: mimeType,
-              data: base64Data
+        const commaIdx = optimizedDataUrl.indexOf(",");
+        const headerPart = commaIdx !== -1 ? optimizedDataUrl.slice(0, commaIdx) : "data:image/png;base64";
+        const mimeMatch = headerPart.match(/^data:([^;]+)/i);
+        const mimeType = (mimeMatch && mimeMatch[1]) ? mimeMatch[1] : "image/png";
+        const base64Data = commaIdx !== -1 ? optimizedDataUrl.slice(commaIdx + 1) : optimizedDataUrl;
+
+        const systemPrompt = [
+          "あなたは日本の高校数学の優秀な教員であり教材作成のスペシャリストです。",
+          "添付された数学の問題画像を読み取り、指定されたルールに従って小テスト用データをJSON形式で出力してください。",
+          "",
+          "【設定条件】",
+          "- 改題モード: " + (remakeMode === "exact" ? "元画像の問題をできるだけ忠実に再現（マーク化/選択肢化のみ行う）" : "元画像の問題を改題（数値を変更した類題を作成）"),
+          "- 出題形式: " + questionType + "（マーク式または選択式）",
+          customPrompt ? ("- 追加指示: " + customPrompt) : "",
+          "",
+          "【数学・表記ルール】",
+          "1. 数式はすべて LaTeX 記法（$ ... $ または $$ ... $$）で美しく記述してください。",
+          "2. マーク式の場合:",
+          "   - 問題文中に穴埋め枠として \\fbox{ ア } や \\fbox{ イ } のようにマーク枠を配置してください。",
+          "   - slotsOrChoices には [\"ア\", \"イ\"] のように使用したマーク枠のカタカナ文字を配列で入れてください。",
+          "   - correctAnswer には \"1, 2\" や \"-, 3\" のようにカンマ区切りで各枠の正解を入れてください。",
+          "3. 選択式の場合:",
+          "   - slotsOrChoices には [\"選択肢Aのテキスト\", \"選択肢Bのテキスト\", \"選択肢Cのテキスト\", \"選択肢Dのテキスト\"] を入れてください（2〜4択）。",
+          "   - correctAnswer には正解の文字（\"A\", \"B\", \"C\", \"D\" のいずれか）を入れてください。",
+          "4. explanationMarkdown には、生徒が読んですぐ理解できる丁寧な途中式とポイント解説を LaTeX を交えて記述してください。",
+          "",
+          "【出力フォーマット】",
+          "以下のJSONフォーマットのみを純粋に出力してください（コードブロック記号は含めないでください）。",
+          "{",
+          "  \"title\": \"単元名・問題タイトル（例: 第◯回 2次関数の決定）\",",
+          "  \"problemMarkdown\": \"問題文の本文（LaTeX数式記法を含む）\",",
+          "  \"type\": \"" + questionType + "\",",
+          "  \"slotsOrChoices\": [\"ア\", \"イ\"],",
+          "  \"correctAnswer\": \"1, 2\",",
+          "  \"explanationMarkdown\": \"解説本文（LaTeX数式記法を含む）\"",
+          "}"
+        ].join("\n");
+
+        const requestBody = {
+          contents: [
+            {
+              parts: [
+                { text: systemPrompt },
+                {
+                  inline_data: {
+                    mime_type: mimeType,
+                    data: base64Data
+                  }
+                }
+              ]
             }
+          ],
+          generationConfig: {
+            temperature: 0.2,
+            response_mime_type: "application/json"
           }
-        ]
-      }
-    ],
-    generationConfig: {
-      temperature: 0.2,
-      response_mime_type: "application/json"
-    }
-  };
+        };
 
-  const modelCandidates = ["gemini-3.8-flash", "gemini-1.5-flash", "gemini-2.0-flash"];
-
-  callGeminiWithFallback(modelCandidates, 0, apiKey, requestBody, "")
-    .then(function (responseData) {
-      const candidates = responseData && responseData.candidates;
-      const firstCandidate = (candidates && candidates.length > 0) ? candidates[0] : null;
-      const parts = (firstCandidate && firstCandidate.content && firstCandidate.content.parts) ? firstCandidate.content.parts : null;
-      const candidateText = (parts && parts.length > 0) ? parts[0].text : null;
-
-      if (!candidateText) {
-        throw new Error("AIから応答が得られませんでした。");
-      }
-
-      let parsedData;
-      try {
-        const fence = String.fromCharCode(96, 96, 96);
-        let cleanJson = candidateText.trim();
-        if (cleanJson.toLowerCase().indexOf(fence + "json") === 0) {
-          cleanJson = cleanJson.slice(fence.length + 4).trim();
-        } else if (cleanJson.indexOf(fence) === 0) {
-          cleanJson = cleanJson.slice(fence.length).trim();
+        const modelCandidates = ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+        return callGeminiWithFallback(modelCandidates, 0, apiKey, requestBody, "", myToken, loadingStatusText);
+      })
+      .then(function (responseData) {
+        if (myToken !== activeGenerateToken) {
+          throw new Error("CANCELLED");
         }
-        if (cleanJson.endsWith(fence)) {
-          cleanJson = cleanJson.slice(0, -fence.length).trim();
+        const candidates = responseData && responseData.candidates;
+        const firstCandidate = (candidates && candidates.length > 0) ? candidates[0] : null;
+        const parts = (firstCandidate && firstCandidate.content && firstCandidate.content.parts) ? firstCandidate.content.parts : null;
+        const candidateText = (parts && parts.length > 0) ? parts[0].text : null;
+
+        if (!candidateText) {
+          throw new Error("AIから応答が得られませんでした（APIキーや入力画像を確認してください）。");
         }
-        parsedData = JSON.parse(cleanJson);
-      } catch (e) {
-        console.error("JSON parse error:", candidateText);
-        throw new Error("AIの応答をJSONとして解釈できませんでした。もう一度お試しください。");
-      }
 
-      currentGeneratedData = parsedData;
-      renderPreview(parsedData);
+        let parsedData;
+        try {
+          const fence = String.fromCharCode(96, 96, 96);
+          let cleanJson = candidateText.trim();
+          if (cleanJson.toLowerCase().indexOf(fence + "json") === 0) {
+            cleanJson = cleanJson.slice(fence.length + 4).trim();
+          } else if (cleanJson.indexOf(fence) === 0) {
+            cleanJson = cleanJson.slice(fence.length).trim();
+          }
+          if (cleanJson.endsWith(fence)) {
+            cleanJson = cleanJson.slice(0, -fence.length).trim();
+          }
+          parsedData = JSON.parse(cleanJson);
+        } catch (e) {
+          console.error("JSON parse error:", candidateText);
+          throw new Error("AIの応答をJSONとして解釈できませんでした。もう一度お試しください。");
+        }
 
-      if (loadingBox) loadingBox.classList.add("hidden");
-      if (resultArea) resultArea.classList.remove("hidden");
-    })
-    .catch(function (error) {
-      console.error("生成エラー:", error);
-      const errMsg = (error && error.message) ? error.message : String(error);
-      alert("生成に失敗しました: " + errMsg);
-      if (loadingBox) loadingBox.classList.add("hidden");
-      if (placeholderBox) placeholderBox.classList.remove("hidden");
-    })
-    .then(function () {
-      if (generateBtn) generateBtn.disabled = false;
-      checkReadyToGenerate();
-    });
+        currentGeneratedData = parsedData;
+        renderPreview(parsedData);
+
+        stopLoadingTimer();
+        if (loadingBox) loadingBox.classList.add("hidden");
+        if (resultArea) resultArea.classList.remove("hidden");
+      })
+      .catch(function (error) {
+        stopLoadingTimer();
+        activeAbortController = null;
+        if (myToken !== activeGenerateToken || (error && error.message === "CANCELLED")) {
+          return;
+        }
+        console.error("生成エラー:", error);
+        const errMsg = (error && error.message) ? error.message : String(error);
+        let hintMsg = "Gemini APIキーやインターネット接続を確認して、もう一度「問題と解説をAI生成する」を押してください。";
+        if (error && error.needsGasCodeUpdate) {
+          hintMsg = "対処法: GAS側の「コード.gs」を最新の gas_code.gs の内容に更新して新バージョンでデプロイすると、学校ネットワーク等でブラウザ直通が遮断される場合でもGASサーバー経由で自動生成できるようになります。";
+        } else if (error && (error.httpStatus === 400 || error.httpStatus === 401 || error.httpStatus === 403)) {
+          hintMsg = "対処法: 左下の「Gemini APIキー」が正しく貼り付けられているか（👁️ボタンで中身が Google AI Studio のキーになっているか）確認してください。";
+        } else if (error && error.httpStatus === 429) {
+          hintMsg = "対処法: 無料枠の連続リクエスト上限に達しました。1分ほど待ってから再試行してください。";
+        }
+        if (loadingBox) loadingBox.classList.add("hidden");
+        if (placeholderBox) placeholderBox.classList.remove("hidden");
+        showGenerateError(errMsg, hintMsg);
+      })
+      .then(function () {
+        activeAbortController = null;
+        if (myToken === activeGenerateToken) {
+          if (generateBtn) generateBtn.disabled = false;
+          checkReadyToGenerate();
+        }
+      });
+  } catch (syncErr) {
+    stopLoadingTimer();
+    const syncMsg = (syncErr && syncErr.message) ? syncErr.message : String(syncErr);
+    console.error("Generate sync error:", syncErr);
+    if (loadingBox) loadingBox.classList.add("hidden");
+    if (placeholderBox) placeholderBox.classList.remove("hidden");
+    if (generateBtn) generateBtn.disabled = false;
+    checkReadyToGenerate();
+    showGenerateError("送信処理の開始時にエラーが発生しました: " + syncMsg, "");
+  }
 }
 
 // ==========================================

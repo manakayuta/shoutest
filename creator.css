@@ -534,6 +534,66 @@ body {
   color: var(--primary-dark);
 }
 
+.loading-elapsed {
+  font-size: 0.85rem;
+  color: var(--text-sub);
+  margin-top: 8px;
+}
+
+.cancel-generate-btn {
+  margin-top: 16px;
+  background-color: #f1f5f9;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.cancel-generate-btn:hover {
+  background-color: #fee2e2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.generate-error-box {
+  background-color: #fef2f2;
+  border: 1.5px solid #fecaca;
+  color: #991b1b;
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin-bottom: 16px;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.generate-error-title {
+  font-weight: 800;
+  font-size: 1rem;
+  margin-bottom: 6px;
+  color: #b91c1c;
+}
+
+.generate-error-detail {
+  background-color: #ffffff;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-family: monospace;
+  font-size: 0.82rem;
+  color: #7f1d1d;
+  margin: 8px 0;
+  word-break: break-all;
+}
+
+.generate-error-hint {
+  font-size: 0.85rem;
+  color: #7f1d1d;
+}
+
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* 数式カード（画像化される領域） */

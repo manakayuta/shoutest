@@ -10,7 +10,7 @@
   <div class="creator-container">
     <header class="creator-header">
       <div class="header-left">
-        <span class="badge" id="versionBadge">教員用ツール v3.2 (⏳ 起動中...)</span>
+        <span class="badge" id="versionBadge">教員用ツール v3.3 (⏳ 起動中...)</span>
         <h1>数学小テスト 問題作成スタジオ 🤖</h1>
         <p class="subtitle">問題画像を貼るだけで、改題・マーク枠化・解説作成・ドライブ保存・シート用コピーまで全自動！</p>
       </div>
@@ -142,7 +142,12 @@
         <div class="loading-box hidden" id="loadingBox">
           <div class="spinner"></div>
           <p class="loading-status" id="loadingStatusText">AIが画像を解析・改題中...</p>
+          <p class="loading-elapsed" id="loadingElapsedText">経過時間: 0秒</p>
+          <button type="button" class="cancel-generate-btn" id="cancelGenerateBtn">✖ 生成を中止する</button>
         </div>
+
+        <!-- 生成エラー詳細ボックス（alertがブロックされても必ず画面に表示） -->
+        <div class="generate-error-box hidden" id="generateErrorBox"></div>
 
         <!-- 生成結果のプレビューエリア -->
         <div class="result-area hidden" id="resultArea">

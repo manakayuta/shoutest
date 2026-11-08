@@ -187,6 +187,49 @@ function uploadImageServer(folderUrl, base64Image, filename) {
   return "https://lh3.googleusercontent.com/d/" + file.getId();
 }
 
+// 5b. 問題作成スタジオ用 Gemini API サーバー中継（ブラウザ側fetch遮断・タイムアウト時の自動フォールバック）
+function generateQuizServer(apiKey, requestBody) {
+  const key = String(apiKey || "").trim();
+  if (!key) {
+    throw new Error("Gemini APIキーが指定されていません。");
+  }
+  const modelCandidates = ["gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"];
+  let lastErr = "Gemini API への接続に失敗しました";
+
+  for (let i = 0; i < modelCandidates.length; i++) {
+    const model = modelCandidates[i];
+    const url = "https://generativelanguage.googleapis.com/v1beta/models/" +
+      encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(key);
+
+    const res = UrlFetchApp.fetch(url, {
+      method: "post",
+      contentType: "application/json",
+      payload: JSON.stringify(requestBody),
+      muteHttpExceptions: true
+    });
+
+    const code = res.getResponseCode();
+    const text = res.getContentText();
+    if (code >= 200 && code < 300) {
+      return JSON.parse(text);
+    }
+
+    let apiErrMsg = "HTTP " + code;
+    try {
+      const parsedErr = JSON.parse(text);
+      if (parsedErr && parsedErr.error && parsedErr.error.message) {
+        apiErrMsg = "HTTP " + code + ": " + parsedErr.error.message;
+      }
+    } catch (e) {}
+
+    lastErr = apiErrMsg + " (model: " + model + ")";
+    if (code === 400 || code === 401 || code === 403 || code === 429) {
+      throw new Error("Gemini API エラー (" + apiErrMsg + ")");
+    }
+  }
+  throw new Error("Gemini API エラー (" + lastErr + ")");
+}
+
 // 6. 外部通信用（POST）
 function doPost(e) {
   try {
