@@ -1,0 +1,1227 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>数学小テスト 問題作成スタジオ (先生専用)</title>
+  <!-- 数式描画ライブラリ KaTeX -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+  <!-- 画像生成ライブラリ html2canvas -->
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <style>
+/* ========================================================
+   問題作成スタジオ スタイルシート (creator.css)
+   ======================================================== */
+
+:root {
+  --primary-color: #2563eb;
+  --primary-dark: #1d4ed8;
+  --success-color: #059669;
+  --success-dark: #047857;
+  --accent-color: #7c3aed;
+  --bg-color: #f1f5f9;
+  --card-bg: #ffffff;
+  --text-main: #0f172a;
+  --text-sub: #475569;
+  --border-color: #cbd5e1;
+  --font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --math-font: "Cambria Math", "Times New Roman", Times, "Yu Mincho", serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: var(--bg-color);
+  color: var(--text-main);
+  padding: 24px 20px;
+  min-height: 100vh;
+}
+
+.creator-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+/* ヘッダー */
+.creator-header {
+  background: white;
+  padding: 20px 28px;
+  border-radius: 14px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.badge {
+  display: inline-block;
+  background-color: #eff6ff;
+  color: var(--primary-color);
+  font-size: 0.8rem;
+  font-weight: 800;
+  padding: 3px 10px;
+  border-radius: 6px;
+  margin-bottom: 6px;
+  letter-spacing: 0.05em;
+}
+
+.creator-header h1 {
+  font-size: 1.6rem;
+  font-weight: 900;
+  color: #0f172a;
+  margin-bottom: 4px;
+}
+
+.subtitle {
+  font-size: 0.95rem;
+  color: var(--text-sub);
+}
+
+.sub-link-btn {
+  background-color: #f8fafc;
+  color: var(--primary-color);
+  border: 1px solid var(--border-color);
+  padding: 10px 18px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.sub-link-btn:hover {
+  background-color: #eff6ff;
+  border-color: var(--primary-color);
+}
+
+/* 2カラムレイアウト */
+.creator-grid {
+  display: grid;
+  grid-template-columns: 460px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.card {
+  background: var(--card-bg);
+  border-radius: 14px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  padding: 24px;
+  border: 1px solid #e2e8f0;
+}
+
+.card-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #1e293b;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #f1f5f9;
+}
+
+/* フォーム部品 */
+.form-group {
+  margin-bottom: 18px;
+}
+
+.form-label {
+  display: block;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #334155;
+  margin-bottom: 6px;
+}
+
+.label-with-badge {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.label-with-badge .form-label {
+  margin-bottom: 0;
+}
+
+.saved-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--success-color);
+  background-color: #ecfdf5;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.field-hint {
+  font-size: 0.75rem;
+  color: var(--text-sub);
+  margin-top: 4px;
+}
+
+.text-input {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1.5px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  color: var(--text-main);
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.text-input:focus {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.text-input.font-bold {
+  font-weight: 700;
+  font-size: 1.05rem;
+}
+
+.password-wrapper {
+  position: relative;
+  display: flex;
+}
+
+.password-wrapper .text-input {
+  padding-right: 42px;
+}
+
+.toggle-vis-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.1rem;
+  padding: 4px;
+}
+
+/* ドロップゾーン */
+.drop-zone {
+  border: 2px dashed #94a3b8;
+  border-radius: 12px;
+  padding: 24px 16px;
+  text-align: center;
+  background-color: #f8fafc;
+  cursor: pointer;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.drop-zone:hover, .drop-zone.drag-over {
+  border-color: var(--primary-color);
+  background-color: #eff6ff;
+}
+
+.file-input {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.drop-icon {
+  font-size: 2.2rem;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.drop-text {
+  font-size: 0.95rem;
+  color: var(--text-main);
+  margin-bottom: 4px;
+}
+
+.drop-subtext {
+  font-size: 0.8rem;
+  color: #64748b;
+}
+
+.image-preview-wrapper {
+  position: relative;
+  max-height: 220px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  overflow: hidden;
+  border-radius: 8px;
+}
+
+.image-preview-wrapper img {
+  max-width: 100%;
+  max-height: 220px;
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+.clear-img-btn {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background-color: rgba(15, 23, 42, 0.75);
+  color: white;
+  border: none;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.clear-img-btn:hover {
+  background-color: #ef4444;
+}
+
+/* ラジオボタングループ */
+.radio-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.radio-label:hover {
+  background-color: #f8fafc;
+  border-color: var(--primary-color);
+}
+
+.radio-label input[type="radio"]:checked + span {
+  color: var(--primary-color);
+}
+
+.divider {
+  border: none;
+  border-top: 1px solid #e2e8f0;
+  margin: 20px 0;
+}
+
+/* 生成ボタン */
+.generate-btn {
+  width: 100%;
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 14px 20px;
+  font-size: 1.1rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+  transition: all 0.2s ease;
+  margin-top: 10px;
+}
+
+.generate-btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+}
+
+.generate-btn:disabled {
+  background: #cbd5e1;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/* 右カラム: プレビュー＆エクスポート */
+.placeholder-box {
+  text-align: center;
+  padding: 60px 20px;
+  color: var(--text-sub);
+}
+
+.placeholder-icon {
+  font-size: 4rem;
+  display: block;
+  margin-bottom: 12px;
+  opacity: 0.6;
+}
+
+.placeholder-box h3 {
+  font-size: 1.2rem;
+  color: var(--text-main);
+  margin-bottom: 8px;
+}
+
+.placeholder-box p {
+  font-size: 0.9rem;
+  max-width: 440px;
+  margin: 0 auto;
+}
+
+/* ローディング中 */
+.loading-box {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.spinner {
+  width: 50px;
+  height: 50px;
+  border: 5px solid #e2e8f0;
+  border-top-color: var(--primary-color);
+  border-radius: 50%;
+  animation: spin 0.8s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+  margin: 0 auto 16px;
+}
+
+.loading-status {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--primary-dark);
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* 数式カード（画像化される領域） */
+.label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.preview-badge {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #1e40af;
+  background-color: #dbeafe;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.preview-badge.secondary {
+  color: #065f46;
+  background-color: #d1fae5;
+}
+
+.math-card {
+  background: #ffffff;
+  border: 2px solid #334155;
+  border-radius: 10px;
+  padding: 24px;
+  position: relative;
+  font-family: var(--math-font);
+  font-size: 1.15rem;
+  line-height: 1.7;
+  color: #0f172a;
+  min-height: 120px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.math-card-badge {
+  position: absolute;
+  top: -12px;
+  left: 16px;
+  background-color: #334155;
+  color: white;
+  font-family: var(--font-family);
+  font-size: 0.8rem;
+  font-weight: 800;
+  padding: 2px 10px;
+  border-radius: 4px;
+  letter-spacing: 0.05em;
+}
+
+.math-card.explanation-card {
+  border-color: #059669;
+  background-color: #fafdfb;
+}
+
+.math-card.explanation-card .math-card-badge {
+  background-color: #059669;
+}
+
+/* 枠・選択肢・正解の行 */
+.form-row-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* 確定・コピーボタン */
+.action-footer {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 2px dashed #e2e8f0;
+}
+
+.export-btn {
+  width: 100%;
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 16px 24px;
+  font-size: 1.15rem;
+  font-weight: 800;
+  cursor: pointer;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 4px 16px rgba(5, 150, 105, 0.3);
+  transition: all 0.2s ease;
+}
+
+.export-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(5, 150, 105, 0.4);
+}
+
+.copy-success-message {
+  margin-top: 14px;
+  background-color: #ecfdf5;
+  border: 1.5px solid #a7f3d0;
+  color: #065f46;
+  padding: 14px 18px;
+  border-radius: 10px;
+  font-size: 0.95rem;
+  text-align: center;
+  animation: fadeIn 0.3s ease-out;
+}
+
+.hidden {
+  display: none !important;
+}
+
+@media (max-width: 1000px) {
+  .creator-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+</style>
+</head>
+<body>
+  <div class="creator-container">
+    <header class="creator-header">
+      <div class="header-left">
+        <span class="badge">教員用ツール</span>
+        <h1>数学小テスト 問題作成スタジオ 🤖</h1>
+        <p class="subtitle">問題画像を貼るだけで、改題・マーク枠化・解説作成・ドライブ保存・シート用コピーまで全自動！</p>
+      </div>
+      <div class="header-right">
+        <a href="index.html" class="sub-link-btn" target="_blank">生徒用テスト画面を開く ↗</a>
+      </div>
+    </header>
+
+    <div class="creator-grid">
+      <!-- 左カラム: 入力・設定パネル -->
+      <section class="card input-panel">
+        <h2 class="card-title">1. 問題の入力とリクエスト</h2>
+
+        <!-- 画像ドロップ・ペーストエリア -->
+        <div class="form-group">
+          <label class="form-label">問題画像（Studyaidスクショや写真）</label>
+          <div class="drop-zone" id="dropZone">
+            <input type="file" id="fileInput" accept="image/*" class="file-input">
+            <div class="drop-zone-content" id="dropZoneContent">
+              <span class="drop-icon">📸</span>
+              <p class="drop-text"><strong>クリックして画像を選択</strong>、またはドラッグ＆ドロップ</p>
+              <p class="drop-subtext">💡 画面切り取り後、<strong>Ctrl + V</strong> で直接貼り付けも可能！</p>
+            </div>
+            <div class="image-preview-wrapper hidden" id="sourceImagePreviewWrapper">
+              <img id="sourceImagePreview" src="" alt="元画像プレビュー">
+              <button type="button" class="clear-img-btn" id="clearImgBtn">× 削除</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 改題リクエスト設定 -->
+        <div class="form-group">
+          <label class="form-label">改題モード</label>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input type="radio" name="remakeMode" value="exact" checked>
+              <span>そのまま使う（マーク化・選択化のみ）</span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="remakeMode" value="remake">
+              <span>改題する（数値替え・類題を作成）</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 出題形式 -->
+        <div class="form-group">
+          <label class="form-label">出題形式</label>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input type="radio" name="questionType" value="マーク" checked>
+              <span>マーク式（共通テスト風穴埋め [ア][イ]...）</span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="questionType" value="選択">
+              <span>選択式（4択・2択など）</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 追加リクエスト（任意） -->
+        <div class="form-group">
+          <label class="form-label">追加の要望（任意）</label>
+          <input type="text" id="customPromptInput" class="text-input" placeholder="例: 「頂点を求める問題にして」「選択肢は4つにして」など">
+        </div>
+
+        <hr class="divider">
+
+        <!-- Google ドライブ保存先設定（自動記憶） -->
+        <div class="form-group">
+          <div class="label-with-badge">
+            <label class="form-label" for="driveFolderUrlInput">画像保存先 Googleドライブ フォルダURL</label>
+            <span class="saved-badge" id="folderSavedNotice">自動記憶済 ✓</span>
+          </div>
+          <input type="text" id="driveFolderUrlInput" class="text-input" placeholder="https://drive.google.com/drive/folders/XXXXX...">
+          <p class="field-hint">※一度入力すればブラウザが記憶します。いつでも書き換え可能です。</p>
+        </div>
+
+        <!-- Gemini APIキー設定（自動記憶） -->
+        <div class="form-group">
+          <div class="label-with-badge">
+            <label class="form-label" for="apiKeyInput">Gemini APIキー（無料）</label>
+            <span class="saved-badge" id="apiSavedNotice">自動記憶済 ✓</span>
+          </div>
+          <div class="password-wrapper">
+            <input type="password" id="apiKeyInput" class="text-input" placeholder="AI Studioで発行したAPIキーを貼り付け">
+            <button type="button" id="toggleApiVisibilityBtn" class="toggle-vis-btn">👁️</button>
+          </div>
+          <p class="field-hint">
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Google AI Studio</a> から1分で無料取得できます。PC内部にのみ安全に保存されます。
+          </p>
+        </div>
+
+        <!-- 生成ボタン -->
+        <button type="button" class="generate-btn" id="generateBtn" disabled>
+          <span class="btn-icon">⚡️</span>
+          <span>問題と解説をAI生成する</span>
+        </button>
+      </section>
+
+      <!-- 右カラム: プレビュー＆確定コピーパネル -->
+      <section class="card output-panel">
+        <h2 class="card-title">2. 生成結果の確認 ＆ ドライブ保存・コピー</h2>
+
+        <!-- 未生成時の案内表示 -->
+        <div class="placeholder-box" id="placeholderBox">
+          <span class="placeholder-icon">📐</span>
+          <h3>左側で問題画像を選んで「AI生成」を押してください</h3>
+          <p>数秒で、マーク枠つき問題画像、詳細な解説画像、正解、スプレッドシート用データがここに表示されます。</p>
+        </div>
+
+        <!-- 生成中のスピナー -->
+        <div class="loading-box hidden" id="loadingBox">
+          <div class="spinner"></div>
+          <p class="loading-status" id="loadingStatusText">AIが画像を解析・改題中...</p>
+        </div>
+
+        <!-- 生成結果のプレビューエリア -->
+        <div class="result-area hidden" id="resultArea">
+          <!-- タイトル編集 -->
+          <div class="form-group">
+            <label class="form-label">問題タイトル案（修正可能）</label>
+            <input type="text" id="resultTitleInput" class="text-input font-bold">
+          </div>
+
+          <!-- 生成された問題カード（画像化対象） -->
+          <div class="form-group">
+            <div class="label-row">
+              <label class="form-label">生成された問題プレビュー</label>
+              <span class="preview-badge">画像として保存されます</span>
+            </div>
+            <div class="math-card" id="problemCard">
+              <div class="math-card-badge" id="problemCardBadge">問題</div>
+              <div class="math-card-content" id="problemCardContent">
+                <!-- KaTeXで数式レンダリング -->
+              </div>
+            </div>
+          </div>
+
+          <!-- 枠・選択肢・正解の確認 -->
+          <div class="form-row-2">
+            <div class="form-group">
+              <label class="form-label" id="choicesLabel">選択肢 / 枠ラベル</label>
+              <input type="text" id="choicesInput" class="text-input" placeholder="例: ア, イ または A, B, C, D">
+              <p class="field-hint">※カンマ区切りで入力</p>
+            </div>
+            <div class="form-group">
+              <label class="form-label">正解</label>
+              <input type="text" id="correctAnswerInput" class="text-input font-bold" placeholder="例: 1, 2">
+            </div>
+          </div>
+
+          <!-- 生成された解説カード（画像化対象） -->
+          <div class="form-group">
+            <div class="label-row">
+              <label class="form-label">生成された解説プレビュー</label>
+              <span class="preview-badge secondary">復習・配布用</span>
+            </div>
+            <div class="math-card explanation-card" id="explanationCard">
+              <div class="math-card-badge explanation-badge">解説・解答のポイント</div>
+              <div class="math-card-content" id="explanationCardContent">
+                <!-- KaTeXで解説レンダリング -->
+              </div>
+            </div>
+          </div>
+
+          <div class="action-footer">
+            <button type="button" class="export-btn" id="exportBtn">
+              <span class="btn-icon">📋</span>
+              <span id="exportBtnText">Googleドライブに保存して、C列貼り付けデータをコピー！</span>
+            </button>
+            <div class="copy-success-message hidden" id="copySuccessMessage">
+              🎉 <strong>コピー完了！</strong> スプレッドシートの <strong>C列（例: C3セル）</strong> を選択して <strong>Ctrl + V</strong> を押してください！
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script>
+/**
+ * ========================================================
+ * 数学小テスト 問題作成スタジオ ロジック (creator.js)
+ * ========================================================
+ */
+
+// 設定キー (localStorage)
+const STORAGE_KEY_API = "quick_quiz_gemini_api_key";
+const STORAGE_KEY_FOLDER = "quick_quiz_drive_folder_url";
+const DEFAULT_GAS_URL = "https://script.google.com/a/macros/hjs.ed.jp/s/AKfycbxq7__DQzX4ci12QfJVhdmWMmAFzCa320LhOSOgl62e5q0idB9U5JJgwSURxRgNBgQk/exec";
+
+// DOM要素
+const apiKeyInput = document.getElementById("apiKeyInput");
+const toggleApiVisibilityBtn = document.getElementById("toggleApiVisibilityBtn");
+const apiSavedNotice = document.getElementById("apiSavedNotice");
+
+const driveFolderUrlInput = document.getElementById("driveFolderUrlInput");
+const folderSavedNotice = document.getElementById("folderSavedNotice");
+
+const dropZone = document.getElementById("dropZone");
+const fileInput = document.getElementById("fileInput");
+const dropZoneContent = document.getElementById("dropZoneContent");
+const sourceImagePreviewWrapper = document.getElementById("sourceImagePreviewWrapper");
+const sourceImagePreview = document.getElementById("sourceImagePreview");
+const clearImgBtn = document.getElementById("clearImgBtn");
+
+const customPromptInput = document.getElementById("customPromptInput");
+const generateBtn = document.getElementById("generateBtn");
+
+const placeholderBox = document.getElementById("placeholderBox");
+const loadingBox = document.getElementById("loadingBox");
+const loadingStatusText = document.getElementById("loadingStatusText");
+const resultArea = document.getElementById("resultArea");
+
+const resultTitleInput = document.getElementById("resultTitleInput");
+const problemCard = document.getElementById("problemCard");
+const problemCardContent = document.getElementById("problemCardContent");
+const explanationCard = document.getElementById("explanationCard");
+const explanationCardContent = document.getElementById("explanationCardContent");
+
+const choicesLabel = document.getElementById("choicesLabel");
+const choicesInput = document.getElementById("choicesInput");
+const correctAnswerInput = document.getElementById("correctAnswerInput");
+
+const exportBtn = document.getElementById("exportBtn");
+const exportBtnText = document.getElementById("exportBtnText");
+const copySuccessMessage = document.getElementById("copySuccessMessage");
+
+// 状態変数
+let currentImageBase64 = null;
+let currentGeneratedData = null;
+
+// ==========================================
+// 1. 初期ロード & 設定の復元（自動記憶）
+// ==========================================
+window.addEventListener("DOMContentLoaded", () => {
+  // APIキーの復元
+  const savedApiKey = localStorage.getItem(STORAGE_KEY_API);
+  if (savedApiKey) {
+    apiKeyInput.value = savedApiKey;
+    apiSavedNotice.style.display = "inline-block";
+  } else {
+    apiSavedNotice.style.display = "none";
+  }
+
+  // フォルダURLの復元
+  const savedFolderUrl = localStorage.getItem(STORAGE_KEY_FOLDER);
+  if (savedFolderUrl) {
+    driveFolderUrlInput.value = savedFolderUrl;
+    folderSavedNotice.style.display = "inline-block";
+  } else {
+    folderSavedNotice.style.display = "none";
+  }
+
+  checkReadyToGenerate();
+});
+
+// APIキーの入力時即座自動保存
+apiKeyInput.addEventListener("input", () => {
+  const key = apiKeyInput.value.trim();
+  if (key) {
+    localStorage.setItem(STORAGE_KEY_API, key);
+    apiSavedNotice.style.display = "inline-block";
+  } else {
+    localStorage.removeItem(STORAGE_KEY_API);
+    apiSavedNotice.style.display = "none";
+  }
+  checkReadyToGenerate();
+});
+
+toggleApiVisibilityBtn.addEventListener("click", () => {
+  if (apiKeyInput.type === "password") {
+    apiKeyInput.type = "text";
+    toggleApiVisibilityBtn.textContent = "🙈";
+  } else {
+    apiKeyInput.type = "password";
+    toggleApiVisibilityBtn.textContent = "👁️";
+  }
+});
+
+// フォルダURLの入力時即座自動保存
+driveFolderUrlInput.addEventListener("input", () => {
+  const url = driveFolderUrlInput.value.trim();
+  if (url) {
+    localStorage.setItem(STORAGE_KEY_FOLDER, url);
+    folderSavedNotice.style.display = "inline-block";
+  } else {
+    localStorage.removeItem(STORAGE_KEY_FOLDER);
+    folderSavedNotice.style.display = "none";
+  }
+});
+
+// ==========================================
+// 2. 画像の取り込み（ファイル・D&D・Ctrl+V）
+// ==========================================
+function handleImageFile(file) {
+  if (!file || !file.type.startsWith("image/")) {
+    alert("画像ファイルを選択してください。");
+    return;
+  }
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    currentImageBase64 = e.target.result;
+    sourceImagePreview.src = currentImageBase64;
+    dropZoneContent.classList.add("hidden");
+    sourceImagePreviewWrapper.classList.remove("hidden");
+    checkReadyToGenerate();
+  };
+  reader.readAsDataURL(file);
+}
+
+fileInput.addEventListener("change", (e) => {
+  if (e.target.files && e.target.files[0]) {
+    handleImageFile(e.target.files[0]);
+  }
+});
+
+// ドラッグ＆ドロップ
+dropZone.addEventListener("dragover", (e) => {
+  e.preventDefault();
+  dropZone.classList.add("drag-over");
+});
+dropZone.addEventListener("dragleave", () => {
+  dropZone.classList.remove("drag-over");
+});
+dropZone.addEventListener("drop", (e) => {
+  e.preventDefault();
+  dropZone.classList.remove("drag-over");
+  if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+    handleImageFile(e.dataTransfer.files[0]);
+  }
+});
+
+// Ctrl + V（クリップボード貼り付け）
+window.addEventListener("paste", (e) => {
+  const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+  for (let i = 0; i < items.length; i++) {
+    if (items[i].type.indexOf("image") !== -1) {
+      const blob = items[i].getAsFile();
+      handleImageFile(blob);
+      break;
+    }
+  }
+});
+
+clearImgBtn.addEventListener("click", (e) => {
+  e.stopPropagation();
+  currentImageBase64 = null;
+  fileInput.value = "";
+  sourceImagePreview.src = "";
+  sourceImagePreviewWrapper.classList.add("hidden");
+  dropZoneContent.classList.remove("hidden");
+  checkReadyToGenerate();
+});
+
+function checkReadyToGenerate() {
+  const hasKey = apiKeyInput.value.trim().length > 0;
+  const hasImage = currentImageBase64 !== null;
+  generateBtn.disabled = !(hasKey && hasImage);
+}
+
+// ==========================================
+// 3. Gemini API による解析・改題・生成
+// ==========================================
+generateBtn.addEventListener("click", async () => {
+  const apiKey = apiKeyInput.value.trim();
+  if (!apiKey) {
+    alert("Gemini APIキーを入力してください。");
+    apiKeyInput.focus();
+    return;
+  }
+  if (!currentImageBase64) {
+    alert("問題画像をセットしてください。");
+    return;
+  }
+
+  const remakeMode = document.querySelector('input[name="remakeMode"]:checked').value;
+  const questionType = document.querySelector('input[name="questionType"]:checked').value;
+  const customPrompt = customPromptInput.value.trim();
+
+  // UI切り替え: ローディング表示
+  placeholderBox.classList.add("hidden");
+  resultArea.classList.add("hidden");
+  loadingBox.classList.remove("hidden");
+  copySuccessMessage.classList.add("hidden");
+  generateBtn.disabled = true;
+
+  try {
+    loadingStatusText.textContent = "AIが画像を解析し、数式と問題を構成しています...";
+
+    // Base64データから純粋な画像データとMIMEタイプを抽出
+    const mimeType = currentImageBase64.split(";")[0].split(":")[1];
+    const base64Data = currentImageBase64.split(",")[1];
+
+    // プロンプトの組み立て
+    const systemPrompt = `
+あなたは日本の高校数学の優秀な教員であり教材作成のスペシャリストです。
+添付された数学の問題画像を読み取り、指定されたルールに従って小テスト用データをJSON形式で出力してください。
+
+【設定条件】
+- 改題モード: ${remakeMode === "exact" ? "元画像の問題をできるだけ忠実に再現（マーク化/選択肢化のみ行う）" : "元画像の問題を改題（数値を変更した類題を作成）"}
+- 出題形式: ${questionType}（マーク式または選択式）
+${customPrompt ? `- 追加指示: ${customPrompt}` : ""}
+
+【数学・表記ルール】
+1. 数式はすべて LaTeX 記法（$ ... $ または $ ... $）で美しく記述してください。
+2. マーク式の場合:
+   - 問題文中に穴埋め枠として \\fbox{ ア } や \\fbox{ イ } のようにマーク枠を配置してください。
+   - slotsOrChoices には ["ア", "イ"] のように使用したマーク枠のカタカナ文字を配列で入れてください。
+   - correctAnswer には "1, 2" や "-, 3" のようにカンマ区切りで各枠の正解を入れてください。
+3. 選択式の場合:
+   - slotsOrChoices には ["選択肢Aのテキスト", "選択肢Bのテキスト", "選択肢Cのテキスト", "選択肢Dのテキスト"] を入れてください（2〜4択）。
+   - correctAnswer には正解の文字（"A", "B", "C", "D" のいずれか）を入れてください。
+4. explanationMarkdown には、生徒が読んですぐ理解できる丁寧な途中式とポイント解説を LaTeX を交えて記述してください。
+
+【出力フォーマット】
+以下のJSONフォーマットのみを純粋に出力してください（バッククォート \`\`\`json も含めないでください）。
+{
+  "title": "単元名・問題タイトル（例: 第◯回 2次関数の決定）",
+  "problemMarkdown": "問題文の本文（LaTeX数式記法を含む）",
+  "type": "${questionType}",
+  "slotsOrChoices": ["ア", "イ"],
+  "correctAnswer": "1, 2",
+  "explanationMarkdown": "解説本文（LaTeX数式記法を含む）"
+}
+`;
+
+    // リクエストボディ
+    const requestBody = {
+      contents: [
+        {
+          parts: [
+            { text: systemPrompt },
+            {
+              inline_data: {
+                mime_type: mimeType,
+                data: base64Data
+              }
+            }
+          ]
+        }
+      ],
+      generationConfig: {
+        temperature: 0.2,
+        response_mime_type: "application/json"
+      }
+    };
+
+    // Gemini API リクエスト（Google最新指定の gemini-3.8-flash を最優先）
+    const modelCandidates = ["gemini-3.8-flash", "gemini-1.5-flash", "gemini-2.0-flash"];
+    let response = null;
+    let lastErrorMsg = "";
+
+    for (const model of modelCandidates) {
+      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      try {
+        const res = await fetch(apiUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(requestBody)
+        });
+        if (res.ok) {
+          response = res;
+          break;
+        } else {
+          const errJson = await res.json().catch(() => ({}));
+          lastErrorMsg = errJson.error?.message || res.statusText;
+        }
+      } catch (err) {
+        lastErrorMsg = err.message;
+      }
+    }
+
+    if (!response) {
+      throw new Error(`Gemini API エラー: ${lastErrorMsg}`);
+    }
+
+    const responseData = await response.json();
+    const candidateText = responseData.candidates?.[0]?.content?.parts?.[0]?.text;
+    if (!candidateText) {
+      throw new Error("AIから応答が得られませんでした。");
+    }
+
+    // JSONパース
+    let parsedData;
+    try {
+      // 余計なマークダウンフェンスをトリム
+      const cleanJson = candidateText.replace(/^```json\s*/, "").replace(/\s*```$/, "").trim();
+      parsedData = JSON.parse(cleanJson);
+    } catch (e) {
+      console.error("JSON parse error:", candidateText);
+      throw new Error("AIの応答をJSONとして解釈できませんでした。もう一度お試しください。");
+    }
+
+    currentGeneratedData = parsedData;
+
+    // プレビュー画面の描画
+    renderPreview(parsedData);
+
+    loadingBox.classList.add("hidden");
+    resultArea.classList.remove("hidden");
+  } catch (error) {
+    console.error("生成エラー:", error);
+    alert(`生成に失敗しました: ${error.message}`);
+    loadingBox.classList.add("hidden");
+    placeholderBox.classList.remove("hidden");
+  } finally {
+    generateBtn.disabled = false;
+  }
+});
+
+// ==========================================
+// 4. プレビューの描画とKaTeX数式レンダリング
+// ==========================================
+function renderPreview(data) {
+  resultTitleInput.value = data.title || "数学 小テスト";
+
+  // 問題文のレンダリング
+  problemCardContent.innerHTML = formatMarkdownMath(data.problemMarkdown);
+  renderMath(problemCardContent);
+
+  // 解説のレンダリング
+  explanationCardContent.innerHTML = formatMarkdownMath(data.explanationMarkdown);
+  renderMath(explanationCardContent);
+
+  // 枠・選択肢
+  const isMark = (data.type === "マーク" || data.type === "マーク式");
+  choicesLabel.textContent = isMark ? "マーク枠ラベル（カンマ区切り）" : "選択肢（カンマ区切り）";
+  choicesInput.value = (data.slotsOrChoices || []).join(", ");
+  correctAnswerInput.value = data.correctAnswer || "";
+}
+
+// 改行や太字の簡易変換
+function formatMarkdownMath(text) {
+  if (!text) return "";
+  return text
+    .replace(/\n\n/g, "<br><br>")
+    .replace(/\n/g, "<br>")
+    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+}
+
+// KaTeX の自動数式レンダリング
+function renderMath(element) {
+  if (typeof renderMathInElement === "function") {
+    renderMathInElement(element, {
+      delimiters: [
+        { left: "$", right: "$", display: true },
+        { left: "$", right: "$", display: false },
+        { left: "\\[", right: "\\]", display: true },
+        { left: "\\(", right: "\\)", display: false }
+      ],
+      throwOnError: false
+    });
+  }
+}
+
+// ==========================================
+// 5. ドライブ保存 ＆ スプレッドシート用TSVコピー
+// ==========================================
+exportBtn.addEventListener("click", async () => {
+  const folderUrl = driveFolderUrlInput.value.trim();
+  const title = resultTitleInput.value.trim() || "小テスト";
+  const type = currentGeneratedData.type || "マーク";
+  const rawChoices = choicesInput.value.split(",").map(s => s.trim()).filter(s => s !== "");
+  const correctAnswer = correctAnswerInput.value.trim();
+
+  copySuccessMessage.classList.add("hidden");
+  exportBtn.disabled = true;
+  exportBtnText.textContent = "問題画像を生成中...";
+
+  try {
+    // 1. 問題カードを html2canvas で高品質PNG画像化
+    const canvas = await html2canvas(problemCard, {
+      scale: 2, // 高解像度（Retina/印刷クオリティ）
+      backgroundColor: "#ffffff"
+    });
+    const problemImageBase64 = canvas.toDataURL("image/png");
+
+    let finalImageUrl = "";
+
+    // 2. Googleドライブへの自動アップロード
+    if (folderUrl && folderUrl.includes("drive.google.com")) {
+      exportBtnText.textContent = "Googleドライブに保存中...";
+
+      try {
+        if (typeof google !== "undefined" && google.script && google.script.run) {
+          // Google Apps Script 環境（Webアプリ内）で動作中の場合
+          finalImageUrl = await new Promise((resolve, reject) => {
+            google.script.run
+              .withSuccessHandler(url => resolve(url))
+              .withFailureHandler(err => reject(err))
+              .uploadImageServer(folderUrl, problemImageBase64, `quiz_${Date.now()}.png`);
+          });
+        } else {
+          // 外部 / ローカル実行時の fetch
+          const uploadPayload = {
+            action: "uploadImage",
+            folderUrl: folderUrl,
+            base64Image: problemImageBase64,
+            filename: `quiz_${Date.now()}.png`
+          };
+
+          const uploadRes = await fetch(DEFAULT_GAS_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            redirect: "follow",
+            body: JSON.stringify(uploadPayload)
+          });
+
+          if (uploadRes.ok) {
+            const resData = await uploadRes.json();
+            if (resData.imageUrl) {
+              finalImageUrl = resData.imageUrl;
+            }
+          }
+        }
+      } catch (e) {
+        console.warn("ドライブ保存エラー (フォールバックします):", e);
+      }
+    }
+
+    // もしドライブAPI未連携、またはエラーの場合はローカルダウンロード案内
+    if (!finalImageUrl) {
+      // プレースホルダーまたは画像ダウンロード
+      finalImageUrl = "（Googleドライブ保存完了後にURLが入ります）";
+      // 画像を自動ダウンロード
+      downloadBase64Image(problemImageBase64, `${title}_問題.png`);
+    }
+
+    // 3. スプレッドシートの C列〜M列 にピッタリ入るタブ区切り文字列（TSV）を作成！
+    // C列: タイトル
+    // D列: 形式 (マーク or 選択)
+    // E列: 画像URL
+    // F列: 選択肢A / 枠ア
+    // G列: 選択肢B / 枠イ
+    // H列: 選択肢C / 枠ウ
+    // I列: 選択肢D / 枠エ
+    // J列: 選択肢E / 枠オ
+    // K列: 選択肢F / 枠カ
+    // L列: 正解
+    // M列: 公開状態 (公開)
+
+    const choiceCols = [
+      rawChoices[0] || "",
+      rawChoices[1] || "",
+      rawChoices[2] || "",
+      rawChoices[3] || "",
+      rawChoices[4] || "",
+      rawChoices[5] || ""
+    ];
+
+    const tsvRow = [
+      title,                                // C列: タイトル
+      (type === "マーク" || type === "マーク式") ? "マーク" : "選択", // D列: 形式
+      finalImageUrl,                        // E列: 画像URL
+      choiceCols[0],                        // F列: 選択肢A
+      choiceCols[1],                        // G列: 選択肢B
+      choiceCols[2],                        // H列: 選択肢C
+      choiceCols[3],                        // I列: 選択肢D
+      choiceCols[4],                        // J列: 選択肢E
+      choiceCols[5],                        // K列: 選択肢F
+      correctAnswer,                        // L列: 正解
+      "公開"                                // M列: 公開状態
+    ].join("\t"); // タブ区切り
+
+    // クリップボードにコピー
+    await navigator.clipboard.writeText(tsvRow);
+
+    // 成功メッセージ表示
+    copySuccessMessage.classList.remove("hidden");
+    exportBtnText.textContent = "✓ 保存＆クリップボードにコピー完了！";
+  } catch (err) {
+    console.error("エクスポートエラー:", err);
+    alert(`保存・コピー処理中にエラーが発生しました: ${err.message}`);
+    exportBtnText.textContent = "Googleドライブに保存して、C列貼り付けデータをコピー！";
+  } finally {
+    exportBtn.disabled = false;
+  }
+});
+
+function downloadBase64Image(base64Data, filename) {
+  const a = document.createElement("a");
+  a.href = base64Data;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+}
+
+</script>
+</body>
+</html>

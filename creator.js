@@ -404,28 +404,39 @@ exportBtn.addEventListener("click", async () => {
       exportBtnText.textContent = "Googleドライブに保存中...";
 
       try {
-        const uploadPayload = {
-          action: "uploadImage",
-          folderUrl: folderUrl,
-          base64Image: problemImageBase64,
-          filename: `quiz_${Date.now()}.png`
-        };
+        if (typeof google !== "undefined" && google.script && google.script.run) {
+          // Google Apps Script 環境（Webアプリ内）で動作中の場合
+          finalImageUrl = await new Promise((resolve, reject) => {
+            google.script.run
+              .withSuccessHandler(url => resolve(url))
+              .withFailureHandler(err => reject(err))
+              .uploadImageServer(folderUrl, problemImageBase64, `quiz_${Date.now()}.png`);
+          });
+        } else {
+          // 外部 / ローカル実行時の fetch
+          const uploadPayload = {
+            action: "uploadImage",
+            folderUrl: folderUrl,
+            base64Image: problemImageBase64,
+            filename: `quiz_${Date.now()}.png`
+          };
 
-        const uploadRes = await fetch(DEFAULT_GAS_URL, {
-          method: "POST",
-          headers: { "Content-Type": "text/plain;charset=utf-8" },
-          redirect: "follow",
-          body: JSON.stringify(uploadPayload)
-        });
+          const uploadRes = await fetch(DEFAULT_GAS_URL, {
+            method: "POST",
+            headers: { "Content-Type": "text/plain;charset=utf-8" },
+            redirect: "follow",
+            body: JSON.stringify(uploadPayload)
+          });
 
-        if (uploadRes.ok) {
-          const resData = await uploadRes.json();
-          if (resData.imageUrl) {
-            finalImageUrl = resData.imageUrl;
+          if (uploadRes.ok) {
+            const resData = await uploadRes.json();
+            if (resData.imageUrl) {
+              finalImageUrl = resData.imageUrl;
+            }
           }
         }
       } catch (e) {
-        console.warn("GASへのドライブ保存API呼び出しエラー (フォールバックします):", e);
+        console.warn("ドライブ保存エラー (フォールバックします):", e);
       }
     }
 

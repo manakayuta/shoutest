@@ -4,8 +4,14 @@
  * ========================================================
  */
 
-// 1. 生徒用Webアプリ画面の配信
+// 1. Webアプリ画面の配信（生徒用または教員用問題作成スタジオ）
 function doGet(e) {
+  if (e && e.parameter && e.parameter.page === "creator") {
+    return HtmlService.createHtmlOutputFromFile("creator")
+      .setTitle("数学小テスト 問題作成スタジオ")
+      .addMetaTag("viewport", "width=device-width, initial-scale=1.0")
+      .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  }
   return HtmlService.createHtmlOutputFromFile("index")
     .setTitle("数学小テストシステム")
     .addMetaTag("viewport", "width=device-width, initial-scale=1.0")
@@ -157,7 +163,31 @@ function convertDriveUrlToDirect(url) {
   return url;
 }
 
-// 5. 問題作成スタジオからのGoogleドライブ自動画像保存 (POST)
+// 5. 問題作成スタジオ（Webアプリ内）からのGoogleドライブ画像保存
+function uploadImageServer(folderUrl, base64Image, filename) {
+  const folderMatch = String(folderUrl || "").match(/\/folders\/([a-zA-Z0-9_-]+)/);
+  if (!folderMatch || !folderMatch[1]) {
+    throw new Error("有効なGoogleドライブフォルダURLではありません（フォルダURL形式を確認してください）");
+  }
+  const folderId = folderMatch[1];
+  const folder = DriveApp.getFolderById(folderId);
+
+  const base64Str = String(base64Image || "").replace(/^data:image\/\w+;base64,/, "");
+  const decodedBytes = Utilities.base64Decode(base64Str);
+  const blob = Utilities.newBlob(decodedBytes, "image/png", filename || `quiz_${Date.now()}.png`);
+
+  const file = folder.createFile(blob);
+  try {
+    file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  } catch (err) {
+    try {
+      file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.VIEW);
+    } catch (e2) {}
+  }
+  return "https://lh3.googleusercontent.com/d/" + file.getId();
+}
+
+// 6. 外部通信用（POST）
 function doPost(e) {
   try {
     const postData = JSON.parse(e.postData.contents);
