@@ -792,7 +792,7 @@ body {
   <div class="creator-container">
     <header class="creator-header">
       <div class="header-left">
-        <span class="badge" id="versionBadge">教員用ツール v3.3 (⏳ 起動中...)</span>
+        <span class="badge" id="versionBadge">教員用ツール v3.4 (⏳ 起動中...)</span>
         <h1>数学小テスト 問題作成スタジオ 🤖</h1>
         <p class="subtitle">問題画像を貼るだけで、改題・マーク枠化・解説作成・ドライブ保存・シート用コピーまで全自動！</p>
       </div>
@@ -1004,9 +1004,9 @@ body {
 
   <script>
 // ========================================================
-// 数学小テスト 問題作成スタジオ ロジック v3.3 (creator.js)
+// 数学小テスト 問題作成スタジオ ロジック v3.4 (creator.js)
 // GAS (HtmlService iframe) / ローカル両対応・完全版
-// 生徒用画面 (index.html) と同一の純粋ES構文・タイムアウト＆サーバー中継フォールバック対応
+// 生徒用画面 (index.html) と同一の純粋ES構文・タイムアウト無制限版
 // ========================================================
 
 const STORAGE_KEY_API = "quick_quiz_gemini_api_key";
@@ -1101,7 +1101,7 @@ function resetPasteBoxState() {
     box.classList.remove("paste-ready");
     box.setAttribute("data-placeholder", "💡 ここをクリックして Ctrl + V（または右クリック→貼り付け）");
   }
-  setPasteStatus("🟢 動作準備OK (v3.3) — ファイル選択 / D&D / Ctrl+V すべて対応", "ready");
+  setPasteStatus("🟢 動作準備OK (v3.4) — ファイル選択 / D&D / Ctrl+V すべて対応", "ready");
 }
 
 // ==========================================
@@ -1384,8 +1384,8 @@ function initCreatorApp() {
       manualCopyBtn.addEventListener("click", handleManualCopyClick);
     }
 
-    setVersionBadge("教員用ツール v3.3 (🟢 動作準備OK)", "badge-ready");
-    setPasteStatus("🟢 動作準備OK (v3.3) — ファイル選択 / D&D / Ctrl+V すべて対応", "ready");
+    setVersionBadge("教員用ツール v3.4 (🟢 動作準備OK)", "badge-ready");
+    setPasteStatus("🟢 動作準備OK (v3.4) — ファイル選択 / D&D / Ctrl+V すべて対応", "ready");
 
     // ブラウザの遅延自動入力（オートフィル）対策
     [300, 1000, 2500].forEach(function (delay) {
@@ -1397,7 +1397,7 @@ function initCreatorApp() {
   } catch (err) {
     const msg = err && err.message ? err.message : String(err);
     console.error("Creator init error:", err);
-    setVersionBadge("教員用ツール v3.3 (🔴 起動エラー: " + msg + ")", "badge-error");
+    setVersionBadge("教員用ツール v3.4 (🔴 起動エラー: " + msg + ")", "badge-error");
     setPasteStatus("🔴 起動エラー: " + msg, "error");
   }
 }
@@ -1405,7 +1405,7 @@ function initCreatorApp() {
 window.addEventListener("error", function (e) {
   if (!isAppInitialized) {
     const msg = (e && e.message) ? e.message : "不明なエラー";
-    setVersionBadge("教員用ツール v3.3 (🔴 エラー: " + msg + ")", "badge-error");
+    setVersionBadge("教員用ツール v3.4 (🔴 エラー: " + msg + ")", "badge-error");
     setPasteStatus("🔴 エラー: " + msg, "error");
   }
 });
@@ -1836,44 +1836,22 @@ function optimizeImageForGemini(dataUrl) {
   });
 }
 
-function fetchWithTimeout(url, options, timeoutMs) {
-  return new Promise(function (resolve, reject) {
-    let finished = false;
-    let controller = null;
-    if (typeof AbortController === "function") {
-      try { controller = new AbortController(); } catch (e) {}
-    }
-    activeAbortController = controller;
+function fetchDirect(url, options) {
+  let controller = null;
+  if (typeof AbortController === "function") {
+    try { controller = new AbortController(); } catch (e) {}
+  }
+  activeAbortController = controller;
 
-    const timer = setTimeout(function () {
-      if (finished) return;
-      finished = true;
-      if (controller) {
-        try { controller.abort(); } catch (e) {}
-      }
-      const err = new Error("通信がタイムアウトしました（" + Math.round(timeoutMs / 1000) + "秒）");
-      err.isNetworkOrTimeout = true;
-      reject(err);
-    }, timeoutMs);
+  const fetchOpts = Object.assign({}, options);
+  if (controller && controller.signal) {
+    fetchOpts.signal = controller.signal;
+  }
 
-    const fetchOpts = Object.assign({}, options);
-    if (controller && controller.signal) {
-      fetchOpts.signal = controller.signal;
-    }
-
-    fetch(url, fetchOpts).then(function (res) {
-      if (finished) return;
-      finished = true;
-      clearTimeout(timer);
-      resolve(res);
-    }).catch(function (err) {
-      if (finished) return;
-      finished = true;
-      clearTimeout(timer);
-      const wrapped = err instanceof Error ? err : new Error(String(err));
-      wrapped.isNetworkOrTimeout = true;
-      reject(wrapped);
-    });
+  return fetch(url, fetchOpts).catch(function (err) {
+    const wrapped = err instanceof Error ? err : new Error(String(err));
+    wrapped.isNetworkError = true;
+    throw wrapped;
   });
 }
 
@@ -1882,19 +1860,9 @@ function callGeminiViaGasServer(apiKey, requestBody, token) {
     return Promise.reject(new Error("GASサーバー環境ではありません"));
   }
   return new Promise(function (resolve, reject) {
-    let settled = false;
-    const serverTimer = setTimeout(function () {
-      if (settled) return;
-      settled = true;
-      reject(new Error("GASサーバー経由のAI応答もタイムアウトしました（45秒）。画像サイズを小さくするか、少し時間をおいて再試行してください。"));
-    }, 45000);
-
     try {
       google.script.run
         .withSuccessHandler(function (res) {
-          if (settled) return;
-          settled = true;
-          clearTimeout(serverTimer);
           if (token !== activeGenerateToken) {
             reject(new Error("CANCELLED"));
             return;
@@ -1902,9 +1870,6 @@ function callGeminiViaGasServer(apiKey, requestBody, token) {
           resolve(res);
         })
         .withFailureHandler(function (err) {
-          if (settled) return;
-          settled = true;
-          clearTimeout(serverTimer);
           const msg = (err && err.message) ? err.message : String(err);
           const wrapped = new Error(msg);
           if (msg.indexOf("generateQuizServer") !== -1 || msg.indexOf("is not a function") !== -1) {
@@ -1914,9 +1879,6 @@ function callGeminiViaGasServer(apiKey, requestBody, token) {
         })
         .generateQuizServer(apiKey, requestBody);
     } catch (err) {
-      if (settled) return;
-      settled = true;
-      clearTimeout(serverTimer);
       reject(err);
     }
   });
@@ -1933,14 +1895,14 @@ function callGeminiWithFallback(modelCandidates, idx, apiKey, requestBody, lastE
   const model = modelCandidates[idx];
   const apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/" + encodeURIComponent(model) + ":generateContent?key=" + encodeURIComponent(apiKey);
   if (statusEl) {
-    statusEl.textContent = "AI (" + model + ") が画像を解析中...（" + (idx + 1) + "/" + modelCandidates.length + "）";
+    statusEl.textContent = "AI (" + model + ") が画像を解析・改題中...（数分かかる場合があります）";
   }
 
-  return fetchWithTimeout(apiUrl, {
+  return fetchDirect(apiUrl, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(requestBody)
-  }, 25000).then(function (res) {
+  }).then(function (res) {
     if (token !== activeGenerateToken) {
       throw new Error("CANCELLED");
     }
@@ -1965,14 +1927,14 @@ function callGeminiWithFallback(modelCandidates, idx, apiKey, requestBody, lastE
     if (err && err.isFatalApiError) {
       throw err;
     }
-    if (err && err.isNetworkOrTimeout) {
+    if (err && err.isNetworkError) {
       if (typeof google !== "undefined" && google.script && google.script.run) {
         if (statusEl) {
-          statusEl.textContent = "直接通信が混み合っているため、GASサーバー経由でAIへ再接続しています...";
+          statusEl.textContent = "直接通信に失敗したため、GASサーバー経由でAIへ再接続しています...";
         }
         return callGeminiViaGasServer(apiKey, requestBody, token).catch(function (gasErr) {
           if (gasErr && gasErr.isMissingServerFn) {
-            const combined = new Error(err.message + "（学校ネットワーク等でブラウザからGeminiへの直接通信が遮断/遅延している可能性があります）");
+            const combined = new Error("ブラウザからの直接通信に失敗しました（学校ネットワーク等で遮断されている可能性があります）");
             combined.needsGasCodeUpdate = true;
             throw combined;
           }
