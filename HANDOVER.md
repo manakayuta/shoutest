@@ -55,7 +55,11 @@
 - [x] フロントエンド（HTML/CSS/JS）の初回実装
 - [x] 初回コミット (`feat: 小テストアプリのフロントエンド初期実装`)
 - [x] 引き継ぎメモ (`HANDOVER.md`) の作成
-- [ ] **【NEXT】** `HANDOVER.md` をコミットに追加
-- [ ] **【NEXT】** GitHubへのプッシュ（リモート連携）
-- [ ] **【NEXT】** GitHub Pagesの設定（生徒がアクセスできる公開URLの発行）
-- [ ] **【FUTURE】** Google Apps Script (GAS) 側の実装と連携
+- [x] GitHubへの初回プッシュと別PCでの動作検証 (`git pull` 成功)
+- [x] GitHub PagesでのWebサイト公開 (https://manakayuta.github.io/shoutest/)
+- [x] スプレッドシート（問題一覧・解答記録）の作成
+- [x] Google Apps Script (GAS) APIの実装とデプロイ
+- [x] フロントエンドにGAS URLを設定
+- [ ] **【NEXT】** スプレッドシートからの問題取得と解答記録の動作確認
+- [ ] **【FUTURE】** 小テスト一覧画面（過去回の受け直し機能）の追加
+- [ ] **【FUTURE】** 記述式など新しい問題形式への対応

@@ -9,7 +9,7 @@
 // ==========================================
 // GASのWebアプリをデプロイしたら、ここに発行されたURLを貼り付けてください。
 // 空文字 "" の状態では自動的に【デモモード】として動作し、動作テストが可能です。
-const GAS_WEB_APP_URL = "";
+const GAS_WEB_APP_URL = "https://script.google.com/a/macros/hjs.ed.jp/s/AKfycbxq7__DQzX4ci12QfJVhdmWMmAFzCa320LhOSOgl62e5q0idB9U5JJgwSURxRgNBgQk/exec";
 
 // デモモード用モックデータ（高校数学の代表的な基本問題）
 // 綺麗な数式SVG画像をインライン生成して使用します
@@ -152,12 +152,13 @@ async function submitAnswer(selectedChoice) {
     };
 
     // Google Apps ScriptのWebアプリPOSTはCORSプリフライトを避けるため
-    // Content-Typeを text/plain にするか、リダイレクト追従を行います
+    // Content-Typeを text/plain にし、リダイレクト追従を行います
     const response = await fetch(GAS_WEB_APP_URL, {
       method: "POST",
       headers: {
         "Content-Type": "text/plain;charset=utf-8"
       },
+      redirect: "follow",
       body: JSON.stringify(payload)
     });
 
@@ -188,17 +189,26 @@ function renderQuestion(questionData) {
   questionNumberEl.textContent = questionData.questionTitle || `問題 (${questionData.questionId || 1})`;
 
   // 画像のロード待機処理
-  imageLoaderEl.style.display = "flex";
-  questionImageEl.style.opacity = "0";
+  if (!questionData.imageUrl || questionData.imageUrl.trim() === "") {
+    // 画像URLがまだ登録されていない場合の案内表示
+    imageLoaderEl.style.display = "flex";
+    imageLoaderEl.innerHTML = `<span style="color:#64748b; font-size:1rem; font-weight:500;">📝 （問題画像は未設定です。プリント等を参照するか、Googleドライブの画像URLを設定してください）</span>`;
+    questionImageEl.style.display = "none";
+  } else {
+    questionImageEl.style.display = "block";
+    imageLoaderEl.style.display = "flex";
+    imageLoaderEl.innerHTML = `<div class="spinner-small"></div><span>画像を読み込み中...</span>`;
+    questionImageEl.style.opacity = "0";
 
-  questionImageEl.onload = () => {
-    imageLoaderEl.style.display = "none";
-    questionImageEl.style.opacity = "1";
-  };
-  questionImageEl.onerror = () => {
-    imageLoaderEl.innerHTML = `<span style="color:#ef4444;">画像の読み込みに失敗しました</span>`;
-  };
-  questionImageEl.src = questionData.imageUrl;
+    questionImageEl.onload = () => {
+      imageLoaderEl.style.display = "none";
+      questionImageEl.style.opacity = "1";
+    };
+    questionImageEl.onerror = () => {
+      imageLoaderEl.innerHTML = `<span style="color:#ef4444;">画像の読み込みに失敗しました（権限またはURLを確認してください）</span>`;
+    };
+    questionImageEl.src = questionData.imageUrl;
+  }
 
   // 選択肢ボタンの動的生成
   choicesContainerEl.innerHTML = "";
