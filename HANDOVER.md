@@ -28,14 +28,18 @@
 ---
 
 ## 3. システムアーキテクチャ
-- **フロントエンド (現在の作業範囲)**:
-  - `index.html`: 画面の骨組み（ローディング / 出題 / 結果 / エラー画面）
-  - `style.css`: レスポンシブUI、アニメーション、物理演算キャンバスのスタイル
-  - `app.js`: GAS APIとの通信、二重送信防止、正誤判定ロジック、紙吹雪パーティクル演出
-  - **デモモード機能**: `app.js` の `GAS_WEB_APP_URL` が空文字の場合、自動的にモック問題（2次関数の頂点）で動く仕様。
-- **バックエンド (今後の予定)**:
-  - Google Apps Script (GAS) + Google スプレッドシート
-  - 問題画像の保管: Google ドライブ
+- **本番WebアプリURL (生徒配布用 / 学校アカウント完全自動判別版)**:
+  `https://script.google.com/a/macros/hjs.ed.jp/s/AKfycbxq7__DQzX4ci12QfJVhdmWMmAFzCa320LhOSOgl62e5q0idB9U5JJgwSURxRgNBgQk/exec`
+- **フロントエンド**:
+  - `gas_index.html`: Google Apps Script上で配信されるHTML/CSS/JS統合版
+  - `gas_code.gs`: GASバックエンドコード（画面配信 `doGet` ＋ サーバーAPI）
+  - `index.html` / `style.css` / `app.js`: ローカル開発・GitHub Pages用コード
+- **バックエンド & データベース**:
+  - Google スプレッドシート（管理シート）:
+    - `問題一覧`: 先生が問題・画像URL・選択肢を管理
+    - `解答記録`: 生徒の解答履歴がリアルタイムで追記される
+    - `成績一覧`: 各生徒の合格回数（努力のプロセス）が全自動マトリクス表示
+  - 画像ストレージ: Google ドライブ（Studyaid等のスクショ画像）
 
 ---
 
@@ -59,10 +63,10 @@
 - [x] GitHub PagesでのWebサイト公開 (https://manakayuta.github.io/shoutest/)
 - [x] スプレッドシート（問題一覧・解答記録）の作成
 - [x] Google Apps Script (GAS) APIの実装とデプロイ
-- [x] フロントエンドにGAS URLを設定
 - [x] スプレッドシートからの問題取得と解答記録の動作確認（データ往復開通完了！🎉）
 - [x] Studyaid等の問題スクショ画像をGoogleドライブに置いて表示するテスト（成功！🎉）
 - [x] 小テスト一覧画面（過去回を選んで受け直せる機能）の実装
-- [ ] **【NEXT】** 一覧画面から複数問を選んで解く動作確認
+- [x] Googleアカウント完全自動判別・なりすまし防止のGAS Webアプリ化完了！🎉
+- [x] 成績一覧マトリクスシート（回数つき合格判定・空欄ガード対応）の完成！🎉
 - [ ] **【FUTURE】** 記述式など新しい問題形式への対応
-- [ ] **【FUTURE】** リアルタイム誤答分析・集計シートの作成
+- [ ] **【FUTURE】** 授業用リアルタイム正答率グラフの作成
