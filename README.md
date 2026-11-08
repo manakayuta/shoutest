@@ -4,8 +4,11 @@
 
 ---
 
-## 🌐 本番WebアプリURL（生徒配布用）
-👉 **https://script.google.com/a/macros/hjs.ed.jp/s/AKfycbxq7__DQzX4ci12QfJVhdmWMmAFzCa320LhOSOgl62e5q0idB9U5JJgwSURxRgNBgQk/exec**
+## 🌐 本番WebアプリURL
+- **生徒配布用**:  
+  👉 **https://script.google.com/a/macros/hjs.ed.jp/s/AKfycbxq7__DQzX4ci12QfJVhdmWMmAFzCa320LhOSOgl62e5q0idB9U5JJgwSURxRgNBgQk/exec**
+- **教員専用「問題作成スタジオ」**:  
+  👉 **https://script.google.com/a/macros/hjs.ed.jp/s/AKfycbxq7__DQzX4ci12QfJVhdmWMmAFzCa320LhOSOgl62e5q0idB9U5JJgwSURxRgNBgQk/exec?page=creator**
 
 * 学校のGoogleアカウント（`hjs.ed.jp`）でログインしている生徒のPCから直接解くことで、生徒のメールアドレスが100%自動で記録され、なりすましを防ぎます。
 * Google Classroom等にこのURLを1つ貼るだけで運用可能です。
@@ -31,7 +34,9 @@
 ---
 
 ## 📁 ファイル構成
-- `gas_code.gs`: Google Apps Script バックエンドコード（API処理＋HTML画面配信）
-- `gas_index.html`: GASに貼り付ける画面コード（HTML+CSS+JS統合版）
-- `index.html` / `style.css` / `app.js`: ローカル開発・検証用コード
-- `HANDOVER.md`: 開発の流れ・仕様・運用ノウハウをすべて記録した引き継ぎ用完全ドキュメント
+- `gas_code.gs`: Google Apps Script バックエンドコード（API処理・画面配信・ドライブ画像保存・Geminiサーバー中継）
+- `gas_index.html`: GASに貼り付ける生徒テスト画面コード（HTML+CSS+JS統合版）
+- `gas_creator.html`: GASに貼り付ける教員専用問題作成スタジオコード（HTML+CSS+JS統合版、`?page=creator` で配信）
+- `index.html` / `style.css` / `app.js`: 生徒画面用ソースコード
+- `creator.html` / `creator.css` / `creator.js`: 教員専用問題作成スタジオのソースコード（編集後は `gas_creator.html` へ再バンドル）
+- `HANDOVER.md`: 開発の流れ・技術仕様・GAS制約・別PCへの引き継ぎ手順をすべて記録した完全ドキュメント

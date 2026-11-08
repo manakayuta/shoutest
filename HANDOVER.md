@@ -1,11 +1,11 @@
 # 数学小テストシステム 開発・運用引き継ぎ完全ドキュメント (HANDOVER.md)
 
-このドキュメントは、本日の開発の流れ・会話履歴の要点・システムの最終仕様・今後の運用方法をすべて網羅した引き継ぎファイルです。  
-別のPCや、新しいAIアシスタントセッションで開発を再開する際は、**「このHANDOVER.mdを読んでサポートしてください」** と伝えるだけで、すべての文脈が100%引き継がれます。
+このドキュメントは、本日の開発の流れ・会話履歴の要点・システムの最終仕様・技術的知見・別PCでの作業再開手順をすべて網羅した引き継ぎファイルです。  
+別PCや、新しいAIアシスタントセッションで開発を再開する際は、**「このHANDOVER.mdを読んでサポートしてください」** と伝えるだけで、すべての文脈が引き継がれます。
 
 ---
 
-## 1. プロジェクト概要・背景
+## 1. プロジェクト概要・本番URL
 - **開発者**: 高校・中学校 数学教員
 - **対象生徒**: 
   - 高校2年生（ア組・イ組）
@@ -14,6 +14,8 @@
 - **利用環境**: 生徒全員がネットワーク接続された端末（Chromebook / Windows PC等）を使用
 - **本番WebアプリURL（生徒配布用）**:  
   👉 `https://script.google.com/a/macros/hjs.ed.jp/s/AKfycbxq7__DQzX4ci12QfJVhdmWMmAFzCa320LhOSOgl62e5q0idB9U5JJgwSURxRgNBgQk/exec`
+- **教員専用「問題作成スタジオ」URL（`?page=creator` 付き）**:  
+  👉 `https://script.google.com/a/macros/hjs.ed.jp/s/AKfycbxq7__DQzX4ci12QfJVhdmWMmAFzCa320LhOSOgl62e5q0idB9U5JJgwSURxRgNBgQk/exec?page=creator`
 
 ---
 
@@ -22,8 +24,8 @@
   - Google Workspace（`hjs.ed.jp`）ドメイン内で直接HTML画面を配信（`HtmlService`）。
   - **なりすまし防止**: 生徒が学校アカウントでログインしている端末からアクセスすることで、生徒のメールアドレス（`Session.getActiveUser().getEmail()`）を100%自動取得・記録。他人のアドレスでの不正受験を物理的に防止。
 - **データベース**: Google スプレッドシート（3つのシートで構成）
-- **問題画像**: 数研出版「Studyaid（スタディエイド）」の画面切り取り（スクショ）等を Google ドライブに保存し、自動直リンク変換して表示。
-- **バージョン管理**: Git / GitHub（リポジトリ: `https://github.com/manakayuta/shoutest.git`）
+- **問題画像**: 数研出版「Studyaid（スタディエイド）」の画面切り取り（スクショ）やAI整形画像等を Google ドライブに保存し、自動直リンク変換（`https://lh3.googleusercontent.com/d/<fileId>`）して表示。
+- **バージョン管理**: Git / GitHub（リポジトリ: `https://github.com/manakayuta/shoutest.git` / `main` ブランチ）
 
 ---
 
@@ -31,13 +33,12 @@
 
 1. **Git / GitHub 初期化と初コミット・初プッシュの達成**:
    - `git init`, `add`, `commit` によりローカルリポジトリを作成。
-   - GitHub Credential Manager を通じた初回ブラウザ認証を成功させ、GitHub への初プッシュ完了。
-   - 別PCでの `git clone` ➔ 編集 ➔ `push` ➔ 元PCでの `git pull` というマルチデバイス開発サイクルを実証。
+   - GitHub Credential Manager を通じた初回ブラウザ認証を成功させ、GitHub へのプッシュ完了。
 2. **Webアプリ基本機能の実装**:
    - ローディング画面 ➔ 出題画面 ➔ 即座送信＆二重送信防止 ➔ 結果画面。
    - 正解時の「物理演算・紙吹雪（Confetti）」アニメーション、不正解時のシェイク演出。
 3. **Google スプレッドシート ＋ GAS バックエンドの開通 (MVP)**:
-   - 問題取得（GET）と解答送信（POST）のデータ往復を開通。
+   - 問題取得と解答送信のデータ往復を開通。
 4. **Studyaid スクショ画像の Google ドライブ自動表示機能**:
    - ドライブの共有リンクをブラウザ直リンクに正規表現で自動変換するロジックをGASに組み込み。
 5. **小テスト一覧画面（過去回受け直し・復習機能）の実装**:
@@ -55,15 +56,66 @@
    - テンキーパレットに「π」「e」ボタンを追加（数学記号のイタリックデザインで配置）。
    - PC物理キーボード入力対応（`e`キーで `e`、`p`キーまたは `π` で `π` を自動入力）。
    - 表記ゆれ吸収（スプレッドシート側に `π`、`pi`、`PI`、`パイ`、`e`、`E` のどれで登録されていても自動照合）。
-10. **教員専用「問題作成スタジオ（creator.html）」の新規開発**:
-    - **入力**: 問題画像（Studyaidスクショや写真・Ctrl+Vペースト対応）、改題モード（そのまま or 改題）、形式（マーク or 選択）、Googleドライブ保存先URL（localStorage自動記憶）。
-    - **AI解析（Gemini API）**: 問題画像を読み取り、LaTeX数式つき問題文、マーク枠/選択肢、正解、詳細な解説を自動生成。
-    - **数式画像化**: KaTeX + html2canvas により、スタディエイド風の美しい問題画像・解説画像を即座にレンダリング。
-    - **ワンクリック登録**: Googleドライブの指定フォルダに画像を自動保存し、スプレッドシートの **C列以降（タイトル〜公開状態）にピッタリ嵌まるタブ区切りデータ（TSV）をクリップボードに一括コピー**！C3セルを選んで Ctrl+V するだけで登録完了。
+10. **教員専用「問題作成スタジオ（`creator.html` / `gas_creator.html`）」の開発と GAS (`HtmlService`) 完全対応化（v1.0 〜 v3.3）**:
+    - **入力**: 問題画像（ファイル選択オーバーレイ・ドラッグ＆ドロップ・`📋 スクショを貼り付け` ボタン・`Ctrl+V` 直接貼付ボックス `contenteditable`＋`MutationObserver` 自動変換）、改題モード（そのまま or 改題）、形式（マーク or 選択）、Googleドライブ保存先URL＆APIキー自動記憶（`safeStorage` による安全ラップ）。
+    - **AI解析（Gemini API）**: `gemini-3.8-flash` をプライマリモデルに採用し、LaTeX数式つき問題文・マーク枠/選択肢・正解・解説をJSON生成（`v3.3` で大きい画像の自動軽量化・25秒タイムアウト・経過時間表示・中止ボタン・画面内エラー表示・`gas_code.gs` の `generateQuizServer` 中継フォールバックを追加）。
+    - **数式画像化・保存・コピー**: KaTeX + `html2canvas`（UI起動後に cdnjs / jsdelivr / unpkg から非同期遅延読み込み）で問題カードを生成し、`google.script.run.uploadImageServer` で指定ドライブフォルダへ自動保存 ＆ スプレッドシート **C〜M列（11列）用TSVデータ** をコピー（クリップボード制限時は手動コピーUI表示）。
+    - **GAS (`HtmlService`) 上での不具合原因特定・恒久対策**:
+      - GAS側前処理がバッククォート `` `...` `` 内の `https://`（`//`）をコメントと誤認して文字列を破壊する問題（`SyntaxError`）を特定し、`creator.js` / `gas_creator.html` から **バッククォート（テンプレートリテラル）を全撤廃**。
+      - `<head>` 等の静的 `<link>` / `<script src>` が通信遅延・ブロック時にJS実行全体を止める問題を解消するため、`gas_index.html` と同じく **外部タグ0の純粋HTML＋末尾インライン `<script>` 構成** に統一。
+      - Strict CSP 対策（インライン `on*` 属性不使用・`addEventListener` 統一）および `?.` / `async` / `await` を排した純粋ES構文に統一。
 
 ---
 
-## 4. Google スプレッドシートの最終構成仕様
+## 4. 現在の到達点 ＆ 別PCでの再開ガイド（重要）
+
+### 現在のステータス（2026-11-08 終了時点）
+- **GitHub 最新バージョン**: **`v3.3`**（`main` ブランチへプッシュ済み）
+- **GAS本番環境での確認済み範囲**:
+  - **v3.2** をGASへデプロイし、画像取り込み（貼り付け等）〜 AI問題生成（「生成されました！」）まで実機GAS上で正常動作を確認済み。
+  - **v3.3** では待ち時間（3分以上）対策として「大きい画像の自動軽量化・経過秒数＆中止ボタン・25秒タイムアウト・画面内エラー表示・`generateQuizServer` サーバー中継」を追加・検証済み（まだGAS実機未デプロイ）。
+
+### 別PCで作業を再開する手順
+1. **リポジトリ同期**:
+   - 別PCで以下を実行して最新を取得：
+     ```bash
+     git clone https://github.com/manakayuta/shoutest.git
+     ```
+     （すでにクローン済みなら `git pull origin main`）
+2. **GASを最新の v3.3 に反映（任意・おすすめ）**:
+   - GASエディタの **`creator`**（`.html`）に [`gas_creator.html`](gas_creator.html) の中身を全上書き保存。
+   - GASエディタの **`コード.gs`** に [`gas_code.gs`](gas_code.gs) の中身を全上書き保存（`generateQuizServer` 用 `UrlFetchApp` の権限承認ダイアログが初回のみ表示されたら許可）。
+   - 右上 **「デプロイ」→「デプロイを管理」→ ✏️編集 → バージョン「新バージョン」→「デプロイ」**。
+   - Webアプリ上部と貼り付け欄下が **`教員用ツール v3.3 (🟢 動作準備OK)`** と表示されればOK。
+3. **次回最初に確認すること（仕上げE2Eテスト）**:
+   - AI生成後に **「Googleドライブに保存して、C列貼り付けデータをコピー！」** ボタンを押す。
+   - 学校Googleドライブフォルダへ画像が保存され、スプレッドシート `問題一覧` の **C3セルに `Ctrl + V` した際、E列に画像URL（`https://lh3.googleusercontent.com/d/...`）が入ること ＆ 生徒用画面で問題画像が綺麗に表示されること** を確認。
+   - 確認できたら 3クラス分へスプレッドシートを複製して運用開始！
+
+### 開発・編集時の絶対ルール（別PCのAI・開発者向け）
+- **単一ソースとバンドル手順**:
+  - 教員スタジオの編集元は **`creator.html` / `creator.css` / `creator.js`** で、GAS配布用 **`gas_creator.html`** は `<link rel="stylesheet" href="creator.css">` と `<script src="creator.js"></script>` をインライン展開して生成しています（生徒用の `index.*` → `gas_index.html` と同様）。`creator.*` を修正したら必ず `gas_creator.html` も再生成してください。
+- **GAS `HtmlService` 互換ルール（厳守）**:
+  1. `creator.js` / `gas_creator.html` 内で **バッククォート（`` ` ``）を使わない**（`://` 等でGAS前処理が構文破壊するため、すべて `"..." + ...` で結合）。
+  2. `creator.html` / `gas_creator.html` に **インライン `on*` 属性・静的な `<link>`・`<script src>`・`<base>` を書かない**。
+  3. `<script>` 内に literal の `<tag` や `?.`、`async`/`await` を書かない（文字列組み立ては `"<" + "br>"` または `document.createElement` を使用）。
+
+---
+
+## 5. ファイル構成一覧
+| ファイル名 | 用途 |
+| :--- | :--- |
+| `gas_code.gs` | Google Apps Script バックエンド（生徒用API・ドライブ画像保存 `uploadImageServer`・Gemini中継 `generateQuizServer`） |
+| `gas_index.html` | GAS貼り付け用 生徒テスト画面（HTML/CSS/JS 統合版・外部CDNなし） |
+| `gas_creator.html` | GAS貼り付け用 教員スタジオ画面（`creator.*` 統合ビルド版・外部CDNなし・バッククォート排除済み） |
+| `index.html` / `style.css` / `app.js` | 生徒画面の分割ソース（ローカル確認用） |
+| `creator.html` / `creator.css` / `creator.js` | 教員スタジオ画面の分割ソース（ビルド元） |
+| `README.md` | リポジトリ概要ドキュメント |
+| `HANDOVER.md` | 本引き継ぎドキュメント |
+
+---
+
+## 6. Google スプレッドシートの最終構成仕様
 
 ### シート1：`問題一覧`（問題管理）
 | 列 | 見出し名 | 説明・入力ルール |
@@ -115,7 +167,7 @@
 
 ---
 
-## 5. 今後の運用方針（3クラスのマルチシート運用）
+## 7. 今後の運用方針（3クラスのマルチシート運用）
 
 担当する3つの授業において、**スプレッドシートをコピーして3つに分けて運用**します。
 
