@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <base target="_top">
   <title>数学小テスト 問題作成スタジオ (先生専用)</title>
   <!-- 数式描画ライブラリ KaTeX CSS -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
@@ -12,12 +13,12 @@
   <div class="creator-container">
     <header class="creator-header">
       <div class="header-left">
-        <span class="badge">教員用ツール v2.0</span>
+        <span class="badge" id="versionBadge">教員用ツール v3.0 (⏳ 起動中...)</span>
         <h1>数学小テスト 問題作成スタジオ 🤖</h1>
         <p class="subtitle">問題画像を貼るだけで、改題・マーク枠化・解説作成・ドライブ保存・シート用コピーまで全自動！</p>
       </div>
       <div class="header-right">
-        <a href="index.html" class="sub-link-btn" target="_blank">生徒用テスト画面を開く ↗</a>
+        <a href="index.html" id="studentAppLink" class="sub-link-btn" target="_blank" rel="noopener">生徒用テスト画面を開く ↗</a>
       </div>
     </header>
 
@@ -29,35 +30,30 @@
         <!-- 画像ドロップ・ペーストエリア -->
         <div class="form-group">
           <label class="form-label">問題画像（Studyaidスクショや写真）</label>
-          <div class="drop-zone" id="dropZone"
-               ondragenter="window.onDragOver && window.onDragOver(event)"
-               ondragover="window.onDragOver && window.onDragOver(event)"
-               ondragleave="window.onDragLeave && window.onDragLeave(event)"
-               ondrop="window.onDropFile && window.onDropFile(event)">
-            <input type="file" id="fileInput" accept="image/*" class="file-input-hidden"
-                   onchange="window.onFileInputChange && window.onFileInputChange(this)">
+          <div class="drop-zone" id="dropZone">
+            <input type="file" id="fileInput" accept="image/*" class="sr-only-file-input">
             <div class="drop-zone-content" id="dropZoneContent">
               <span class="drop-icon">📸</span>
               <p class="drop-text">ここに画像を<strong>ドラッグ＆ドロップ</strong>、または下のボタンから取り込み</p>
               <div class="upload-btn-group">
-                <label for="fileInput" class="upload-action-btn file-select-btn" onclick="event.stopPropagation();">
+                <label for="fileInput" id="fileSelectLabel" class="upload-action-btn file-select-btn">
                   📁 ファイルを選択
                 </label>
-                <button type="button" class="upload-action-btn clip-paste-btn" id="clipPasteBtn"
-                        onclick="event.stopPropagation(); window.onPasteButtonClick && window.onPasteButtonClick();">
+                <button type="button" class="upload-action-btn clip-paste-btn" id="clipPasteBtn">
                   📋 スクショを貼り付け
                 </button>
               </div>
-              <input type="text" id="pasteCatcherInput" class="paste-catcher-input"
-                     placeholder="💡 ここをクリックして Ctrl + V でも直接貼り付けできます"
-                     readonly
-                     onclick="event.stopPropagation(); this.focus();"
-                     onpaste="window.onPasteEvent && window.onPasteEvent(event)">
+              <div id="pasteCatcherBox"
+                   class="paste-catcher-box"
+                   contenteditable="true"
+                   role="textbox"
+                   aria-label="画像貼り付け欄"
+                   data-placeholder="💡 ここをクリックして Ctrl + V（または右クリック→貼り付け）"></div>
+              <p class="paste-status-msg hidden" id="pasteStatusMsg"></p>
             </div>
             <div class="image-preview-wrapper hidden" id="sourceImagePreviewWrapper">
               <img id="sourceImagePreview" src="" alt="元画像プレビュー">
-              <button type="button" class="clear-img-btn" id="clearImgBtn"
-                      onclick="window.onClearImage && window.onClearImage(event)">× 削除</button>
+              <button type="button" class="clear-img-btn" id="clearImgBtn">× 削除</button>
             </div>
           </div>
         </div>
@@ -107,8 +103,7 @@
             <span class="saved-badge" id="folderSavedNotice" style="display:none;">自動記憶済 ✓</span>
           </div>
           <input type="text" id="driveFolderUrlInput" class="text-input"
-                 placeholder="https://drive.google.com/drive/folders/XXXXX..."
-                 oninput="window.onFolderUrlInput && window.onFolderUrlInput()">
+                 placeholder="https://drive.google.com/drive/folders/XXXXX...">
           <p class="field-hint">※一度入力すればブラウザが記憶します。いつでも書き換え可能です。</p>
         </div>
 
@@ -120,10 +115,8 @@
           </div>
           <div class="password-wrapper">
             <input type="password" id="apiKeyInput" class="text-input"
-                   placeholder="AI Studioで発行したAPIキーを貼り付け"
-                   oninput="window.onApiKeyInput && window.onApiKeyInput()">
-            <button type="button" id="toggleApiVisibilityBtn" class="toggle-vis-btn"
-                    onclick="window.onToggleApiVis && window.onToggleApiVis()">👁️</button>
+                   placeholder="AI Studioで発行したAPIキーを貼り付け">
+            <button type="button" id="toggleApiVisibilityBtn" class="toggle-vis-btn">👁️</button>
           </div>
           <p class="field-hint">
             <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Google AI Studio</a> から1分で無料取得できます。PC内部にのみ安全に保存されます。
@@ -131,8 +124,7 @@
         </div>
 
         <!-- 生成ボタン -->
-        <button type="button" class="generate-btn" id="generateBtn" disabled
-                onclick="window.onGenerateClick && window.onGenerateClick()">
+        <button type="button" class="generate-btn" id="generateBtn" disabled>
           <span class="btn-icon">⚡️</span>
           <span>問題と解説をAI生成する</span>
         </button>
@@ -205,13 +197,20 @@
           </div>
 
           <div class="action-footer">
-            <button type="button" class="export-btn" id="exportBtn"
-                    onclick="window.onExportClick && window.onExportClick()">
+            <button type="button" class="export-btn" id="exportBtn">
               <span class="btn-icon">📋</span>
               <span id="exportBtnText">Googleドライブに保存して、C列貼り付けデータをコピー！</span>
             </button>
+            <div class="export-warning-message hidden" id="exportWarningMessage"></div>
             <div class="copy-success-message hidden" id="copySuccessMessage">
               🎉 <strong>コピー完了！</strong> スプレッドシートの <strong>C列（例: C3セル）</strong> を選択して <strong>Ctrl + V</strong> を押してください！
+            </div>
+            <div class="manual-copy-box hidden" id="manualCopyBox">
+              <p class="manual-copy-hint">※自動コピーがブロックされた場合は、下の「データをコピー」ボタンを押すか全選択してコピーしてください：</p>
+              <div class="manual-copy-row">
+                <textarea id="manualCopyTextarea" class="manual-copy-textarea" rows="2" readonly></textarea>
+                <button type="button" id="manualCopyBtn" class="manual-copy-btn">📋 データをコピー</button>
+              </div>
             </div>
           </div>
         </div>
