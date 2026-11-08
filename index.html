@@ -21,7 +21,7 @@
       <section id="listScreen" class="screen">
         <div class="list-header">
           <h2 class="list-title">小テスト一覧</h2>
-          <p class="list-subtitle">受ける小テストを選んでください（過去の復習も可能です）</p>
+          <p class="list-subtitle">受ける小テストを選んでください（クリア済みも復習できます）</p>
         </div>
         <div id="quizListContainer" class="quiz-list-container">
           <!-- JSでテストカード一覧を動的生成 -->
@@ -43,7 +43,7 @@
         </div>
         <div class="question-header">
           <span class="question-number" id="questionNumber">問題</span>
-          <span class="instruction">正しい選択肢を1つ選んでください</span>
+          <span class="instruction" id="questionInstruction">正しい選択肢を1つ選んでください</span>
         </div>
 
         <!-- 問題画像表示エリア -->
@@ -55,9 +55,32 @@
           </div>
         </div>
 
-        <!-- 4つの選択肢ボタンエリア -->
+        <!-- A. 選択肢ボタンエリア（2〜6択用） -->
         <div class="choices-container" id="choicesContainer">
-          <!-- JavaScriptで動的に選択肢ボタン（4つ）を生成します -->
+          <!-- JavaScriptで動的に選択肢ボタンを生成 -->
+        </div>
+
+        <!-- B. マーク式入力エリア（穴埋めスロット用） -->
+        <div class="mark-container hidden" id="markContainer">
+          <div class="mark-instruction">枠をタップして、数字または符号を入力してください（キーボード入力可）</div>
+          <div class="mark-slots-wrapper" id="markSlotsWrapper">
+            <!-- JSでスロット [ ア : _ ] [ イ : _ ] を動的生成 -->
+          </div>
+          <div class="mark-keypad" id="markKeypad">
+            <button type="button" class="keypad-btn" data-key="-">−</button>
+            <button type="button" class="keypad-btn" data-key="0">0</button>
+            <button type="button" class="keypad-btn" data-key="1">1</button>
+            <button type="button" class="keypad-btn" data-key="2">2</button>
+            <button type="button" class="keypad-btn" data-key="3">3</button>
+            <button type="button" class="keypad-btn" data-key="4">4</button>
+            <button type="button" class="keypad-btn" data-key="5">5</button>
+            <button type="button" class="keypad-btn" data-key="6">6</button>
+            <button type="button" class="keypad-btn" data-key="7">7</button>
+            <button type="button" class="keypad-btn" data-key="8">8</button>
+            <button type="button" class="keypad-btn" data-key="9">9</button>
+            <button type="button" class="keypad-btn delete-btn" data-key="backspace">⌫ 戻る</button>
+          </div>
+          <button type="button" class="primary-btn mark-submit-btn" id="markSubmitBtn" disabled>解答を送信する</button>
         </div>
 
         <!-- 送信中オーバーレイ（二重送信防止＆インジケーター） -->
@@ -71,7 +94,6 @@
       <section id="resultScreen" class="screen">
         <div class="result-card" id="resultCard">
           <div class="result-icon-wrapper" id="resultIconWrapper">
-            <!-- JSで正解（⭕️/トロフィー）や不正解（❌/ファイト）のアイコンを表示 -->
             <span id="resultIcon" class="result-icon">🎉</span>
           </div>
           <h2 id="resultTitle" class="result-title">正解！</h2>

@@ -1,10 +1,9 @@
 /**
  * ========================================================
- * 数学小テストシステム 最大6択対応版 (コード.gs)
+ * 数学小テストシステム マーク式＋選択式ハイブリッド版 (コード.gs)
  * ========================================================
  */
 
-// 1. 生徒がアクセスした時に画面（HTML）を表示する
 function doGet(e) {
   return HtmlService.createHtmlOutputFromFile("index")
     .setTitle("数学小テストシステム")
@@ -15,24 +14,44 @@ function doGet(e) {
 // 2. 問題一覧の取得
 function getQuestionListServer() {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName("問題一覧");
-  if (!sheet) throw new Error("「問題一覧」シートが見つかりません");
+  const qSheet = ss.getSheetByName("問題一覧");
+  const aSheet = ss.getSheetByName("解答記録");
+  if (!qSheet || !aSheet) throw new Error("必要なシートが見つかりません");
 
-  const data = sheet.getDataRange().getValues();
-  if (data.length <= 1) return [];
+  const qData = qSheet.getDataRange().getValues();
+  if (qData.length <= 1) return [];
 
-  const rows = data.slice(1);
-  return rows
-    .filter(r => String(r[12]).trim() === "公開") // M列(インデックス12)が「公開」
-    .map(r => ({
-      questionId: String(r[0]),
-      round: String(r[1]),
-      title: String(r[2]),
-      type: String(r[3])
-    }));
+  const studentEmail = Session.getActiveUser().getEmail();
+  const aRows = aSheet.getDataRange().getValues().slice(1);
+  const passedSet = new Set();
+  
+  if (studentEmail) {
+    aRows.forEach(row => {
+      const email = String(row[1]).trim().toLowerCase();
+      const qId = String(row[2]).trim();
+      const result = String(row[5]).trim();
+      if (email === studentEmail.toLowerCase() && result === "正解") {
+        passedSet.add(qId);
+      }
+    });
+  }
+
+  const qRows = qData.slice(1);
+  return qRows
+    .filter(r => String(r[12]).trim() === "公開") // M列が「公開」
+    .map(r => {
+      const qId = String(r[0]);
+      return {
+        questionId: qId,
+        round: String(r[1]),
+        title: String(r[2]),
+        type: String(r[3]),
+        isPassed: passedSet.has(qId)
+      };
+    });
 }
 
-// 3. 個別問題データの取得（最大6択まで対応）
+// 3. 個別問題データの取得（マーク式ラベル・最大6択対応）
 function getQuestionServer(questionId) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("問題一覧");
@@ -52,14 +71,14 @@ function getQuestionServer(questionId) {
   const rawImageUrl = String(targetRow[4] || "");
   const directImageUrl = convertDriveUrlToDirect(rawImageUrl);
 
-  // F列(5)〜K列(10)の最大6択を取得し、空欄でないものだけを抽出
+  // F列(5)〜K列(10)の最大6項目
   const choices = [
-    String(targetRow[5] || ""),  // 選択肢A
-    String(targetRow[6] || ""),  // 選択肢B
-    String(targetRow[7] || ""),  // 選択肢C
-    String(targetRow[8] || ""),  // 選択肢D
-    String(targetRow[9] || ""),  // 選択肢E
-    String(targetRow[10] || "")  // 選択肢F
+    String(targetRow[5] || ""),
+    String(targetRow[6] || ""),
+    String(targetRow[7] || ""),
+    String(targetRow[8] || ""),
+    String(targetRow[9] || ""),
+    String(targetRow[10] || "")
   ].filter(c => c.trim() !== "");
 
   return {
@@ -68,11 +87,11 @@ function getQuestionServer(questionId) {
     questionTitle: `${targetRow[1]} ${targetRow[2]}`,
     type: String(targetRow[3]),
     imageUrl: directImageUrl,
-    choices: choices.length > 0 ? choices : ["A", "B"]
+    choices: choices.length > 0 ? choices : ["ア", "イ"]
   };
 }
 
-// 4. 解答の送信と成績記録
+// 4. 解答送信と記録（★マーク式の表記ゆれ吸収対応）
 function submitAnswerServer(questionId, selectedChoice) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const qSheet = ss.getSheetByName("問題一覧");
@@ -84,12 +103,22 @@ function submitAnswerServer(questionId, selectedChoice) {
   const targetQ = qRows.find(r => String(r[0]) === String(questionId));
   if (!targetQ) throw new Error("該当の問題が見つかりません");
 
-  // L列(インデックス11)が「正解」
   const correctAnswer = String(targetQ[11]).trim();
   const studentAnswer = String(selectedChoice).trim();
-  const isCorrect = (studentAnswer.toUpperCase() === correctAnswer.toUpperCase());
 
-  // 生徒の学校メールアドレス
+  // 正誤判定:
+  // 1. 通常の完全一致
+  let isCorrect = (studentAnswer.toUpperCase() === correctAnswer.toUpperCase());
+
+  // 2. マーク式用の正規化（カンマ、空白、ハイフン、全角記号を除去・統一して比較）
+  if (!isCorrect) {
+    const cleanStudent = studentAnswer.replace(/[\s,、\-_ー−]/g, "").toUpperCase();
+    const cleanCorrect = correctAnswer.replace(/[\s,、\-_ー−]/g, "").toUpperCase();
+    if (cleanStudent !== "" && cleanStudent === cleanCorrect) {
+      isCorrect = true;
+    }
+  }
+
   let studentEmail = Session.getActiveUser().getEmail();
   if (!studentEmail) {
     studentEmail = "未取得アカウント";
@@ -115,7 +144,6 @@ function submitAnswerServer(questionId, selectedChoice) {
   };
 }
 
-// Googleドライブ画像URLの自動変換
 function convertDriveUrlToDirect(url) {
   if (!url) return "";
   if (url.includes("lh3.googleusercontent.com") || url.startsWith("data:")) return url;

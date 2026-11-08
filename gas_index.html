@@ -5,9 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>数学小テストシステム</title>
   <style>
-/* ========================================================
-   スタイルシート (style.css 内包版)
-   ======================================================== */
 :root {
   --primary-color: #3b82f6;
   --primary-dark: #1d4ed8;
@@ -95,7 +92,7 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
-/* 0. 一覧画面 */
+/* 一覧画面 */
 .list-header { margin-bottom: 20px; text-align: center; }
 .list-title { font-size: 1.5rem; font-weight: 800; color: #0f172a; margin-bottom: 6px; }
 .list-subtitle { font-size: 0.95rem; color: var(--text-sub); }
@@ -130,7 +127,16 @@ body {
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.12);
 }
 
-.quiz-card-info { display: flex; align-items: center; gap: 12px; flex: 1; }
+.quiz-card.passed {
+  border-color: #a7f3d0;
+  background-color: #f0fdf4;
+}
+.quiz-card.passed:hover {
+  border-color: var(--success-color);
+  background-color: #ecfdf5;
+}
+
+.quiz-card-info { display: flex; align-items: center; gap: 10px; flex: 1; flex-wrap: wrap; }
 .round-badge {
   background-color: #eff6ff;
   color: var(--primary-dark);
@@ -140,11 +146,39 @@ body {
   border-radius: 8px;
   white-space: nowrap;
 }
+
+.status-badge {
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.status-badge.passed-badge {
+  background-color: #d1fae5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+.status-badge.unpassed-badge {
+  background-color: #f1f5f9;
+  color: var(--text-sub);
+}
+
 .quiz-card-title { font-size: 1.1rem; font-weight: 700; color: var(--text-main); }
 .quiz-card-type { font-size: 0.8rem; color: var(--text-sub); background-color: #f1f5f9; padding: 2px 8px; border-radius: 6px; }
-.quiz-card-action { font-weight: 700; color: var(--primary-color); font-size: 0.95rem; display: flex; align-items: center; gap: 4px; }
 
-/* 1. ローディング画面 */
+.quiz-card-action {
+  font-weight: 700;
+  color: var(--primary-color);
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.quiz-card.passed .quiz-card-action { color: var(--success-color); }
+
+/* ローディング画面 */
 #loadingScreen { justify-content: center; align-items: center; text-align: center; }
 .spinner-wrapper { display: flex; flex-direction: column; align-items: center; gap: 20px; }
 .spinner {
@@ -164,7 +198,7 @@ body {
 .loading-text { font-size: 1.1rem; color: var(--text-sub); font-weight: 500; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* 2. 出題画面 */
+/* 出題画面 */
 .question-top-bar { margin-bottom: 12px; }
 .back-link-btn {
   background: none; border: none; color: var(--primary-color);
@@ -179,21 +213,23 @@ body {
 .instruction { font-size: 0.9rem; color: var(--text-sub); }
 
 .image-container {
-  width: 100%; min-height: 220px; max-height: 380px;
+  width: 100%; min-height: 200px; max-height: 360px;
   background-color: #f8fafc; border: 2px dashed #cbd5e1; border-radius: 12px;
   display: flex; justify-content: center; align-items: center; padding: 16px;
-  margin-bottom: 24px; position: relative; overflow: hidden;
+  margin-bottom: 20px; position: relative; overflow: hidden;
 }
-.image-container img { max-width: 100%; max-height: 340px; object-fit: contain; border-radius: 8px; }
+.image-container img { max-width: 100%; max-height: 320px; object-fit: contain; border-radius: 8px; }
 .image-loader {
   position: absolute; display: flex; flex-direction: column; align-items: center; gap: 10px;
   color: var(--text-sub); font-size: 0.9rem; padding: 12px; text-align: center;
 }
 
+/* A. 選択式（2〜6択） */
 .choices-container { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+.choices-container.hidden { display: none; }
 .choice-btn {
   background-color: #ffffff; border: 2px solid var(--border-color); border-radius: 12px;
-  padding: 16px 20px; font-size: 1.1rem; font-weight: 600; color: var(--text-main);
+  padding: 14px 18px; font-size: 1.05rem; font-weight: 600; color: var(--text-main);
   cursor: pointer; display: flex; align-items: center; gap: 12px; transition: all 0.2s ease;
   box-shadow: var(--shadow-sm); outline: none; user-select: none;
 }
@@ -211,6 +247,52 @@ body {
 .choice-btn:disabled { cursor: not-allowed; opacity: 0.65; }
 .choice-btn.selected { border-color: var(--primary-color); background-color: #dbeafe; }
 
+/* B. マーク式（穴埋めスロット） */
+.mark-container {
+  display: flex; flex-direction: column; gap: 16px; align-items: center;
+}
+.mark-container.hidden { display: none; }
+.mark-instruction { font-size: 0.85rem; color: var(--text-sub); text-align: center; }
+.mark-slots-wrapper {
+  display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; width: 100%;
+}
+.mark-slot {
+  display: flex; align-items: center; background-color: #ffffff;
+  border: 2px solid var(--border-color); border-radius: 12px; padding: 8px 16px;
+  gap: 10px; cursor: pointer; transition: all 0.2s ease; user-select: none; min-width: 90px;
+}
+.mark-slot.active {
+  border-color: var(--primary-color); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+  transform: scale(1.05);
+}
+.mark-slot-label { font-size: 1.1rem; font-weight: 800; color: var(--primary-dark); }
+.mark-slot-value {
+  font-size: 1.4rem; font-weight: 800; color: var(--text-main); min-width: 24px;
+  height: 36px; display: flex; justify-content: center; align-items: center;
+  border-bottom: 2px solid #cbd5e1;
+}
+.mark-slot.active .mark-slot-value { border-bottom-color: var(--primary-color); }
+
+.mark-keypad {
+  display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; max-width: 480px; width: 100%;
+}
+.keypad-btn {
+  background-color: #f8fafc; border: 1px solid var(--border-color); border-radius: 10px;
+  padding: 12px 6px; font-size: 1.25rem; font-weight: 700; color: var(--text-main);
+  cursor: pointer; transition: all 0.15s ease; box-shadow: var(--shadow-sm); outline: none; user-select: none;
+}
+.keypad-btn:hover { background-color: #eff6ff; border-color: var(--primary-color); transform: translateY(-2px); }
+.keypad-btn:active { transform: translateY(0); }
+.keypad-btn.delete-btn {
+  grid-column: span 2; font-size: 0.95rem; background-color: #fee2e2; color: #991b1b; border-color: #fca5a5;
+}
+.keypad-btn.delete-btn:hover { background-color: #fecaca; }
+
+.mark-submit-btn { width: 100%; max-width: 360px; margin-top: 6px; }
+.mark-submit-btn:disabled {
+  opacity: 0.5; cursor: not-allowed; transform: none !important; box-shadow: none !important;
+}
+
 .submitting-overlay {
   position: absolute; top: 0; left: 0; width: 100%; height: 100%;
   background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(2px); border-radius: var(--border-radius);
@@ -219,7 +301,7 @@ body {
 }
 .submitting-overlay.hidden { display: none; }
 
-/* 3. 結果画面 */
+/* 結果画面 */
 #resultScreen { justify-content: center; align-items: center; }
 .result-card { text-align: center; max-width: 480px; width: 100%; margin: auto; padding: 10px; }
 .result-icon-wrapper { margin-bottom: 16px; display: inline-block; }
@@ -273,6 +355,8 @@ body {
   .main-card { padding: 18px; }
   .quiz-card { flex-direction: column; align-items: flex-start; gap: 8px; }
   .quiz-card-action { align-self: flex-end; }
+  .mark-keypad { grid-template-columns: repeat(4, 1fr); }
+  .keypad-btn.delete-btn { grid-column: span 1; }
 }
   </style>
 </head>
@@ -290,7 +374,7 @@ body {
       <section id="listScreen" class="screen">
         <div class="list-header">
           <h2 class="list-title">小テスト一覧</h2>
-          <p class="list-subtitle">受ける小テストを選んでください（過去の復習も可能です）</p>
+          <p class="list-subtitle">受ける小テストを選んでください（クリア済みも復習できます）</p>
         </div>
         <div id="quizListContainer" class="quiz-list-container"></div>
       </section>
@@ -310,7 +394,7 @@ body {
         </div>
         <div class="question-header">
           <span class="question-number" id="questionNumber">問題</span>
-          <span class="instruction">正しい選択肢を1つ選んでください</span>
+          <span class="instruction" id="questionInstruction">正しい選択肢を1つ選んでください</span>
         </div>
 
         <div class="image-container">
@@ -321,7 +405,29 @@ body {
           </div>
         </div>
 
+        <!-- A. 選択式ボタンエリア（2〜6択） -->
         <div class="choices-container" id="choicesContainer"></div>
+
+        <!-- B. マーク式入力エリア（穴埋めスロット） -->
+        <div class="mark-container hidden" id="markContainer">
+          <div class="mark-instruction">枠をタップして、数字または符号を入力してください（キーボード入力可）</div>
+          <div class="mark-slots-wrapper" id="markSlotsWrapper"></div>
+          <div class="mark-keypad" id="markKeypad">
+            <button type="button" class="keypad-btn" data-key="-">−</button>
+            <button type="button" class="keypad-btn" data-key="0">0</button>
+            <button type="button" class="keypad-btn" data-key="1">1</button>
+            <button type="button" class="keypad-btn" data-key="2">2</button>
+            <button type="button" class="keypad-btn" data-key="3">3</button>
+            <button type="button" class="keypad-btn" data-key="4">4</button>
+            <button type="button" class="keypad-btn" data-key="5">5</button>
+            <button type="button" class="keypad-btn" data-key="6">6</button>
+            <button type="button" class="keypad-btn" data-key="7">7</button>
+            <button type="button" class="keypad-btn" data-key="8">8</button>
+            <button type="button" class="keypad-btn" data-key="9">9</button>
+            <button type="button" class="keypad-btn delete-btn" data-key="backspace">⌫ 戻る</button>
+          </div>
+          <button type="button" class="primary-btn mark-submit-btn" id="markSubmitBtn" disabled>解答を送信する</button>
+        </div>
 
         <div id="submittingOverlay" class="submitting-overlay hidden">
           <div class="spinner-small"></div>
@@ -368,11 +474,6 @@ body {
   </div>
 
   <script>
-/**
- * ========================================================
- * アプリケーションロジック (GAS内部完全統合版)
- * ========================================================
- */
 const screens = {
   list: document.getElementById("listScreen"),
   loading: document.getElementById("loadingScreen"),
@@ -386,11 +487,17 @@ const quizListContainerEl = document.getElementById("quizListContainer");
 const backToListFromQuestionBtnEl = document.getElementById("backToListFromQuestionBtn");
 const backToListFromResultBtnEl = document.getElementById("backToListFromResultBtn");
 const questionNumberEl = document.getElementById("questionNumber");
+const questionInstructionEl = document.getElementById("questionInstruction");
 const questionImageEl = document.getElementById("questionImage");
 const imageLoaderEl = document.getElementById("imageLoader");
-const choicesContainerEl = document.getElementById("choicesContainer");
-const submittingOverlayEl = document.getElementById("submittingOverlay");
 
+const choicesContainerEl = document.getElementById("choicesContainer");
+const markContainerEl = document.getElementById("markContainer");
+const markSlotsWrapperEl = document.getElementById("markSlotsWrapper");
+const markKeypadEl = document.getElementById("markKeypad");
+const markSubmitBtnEl = document.getElementById("markSubmitBtn");
+
+const submittingOverlayEl = document.getElementById("submittingOverlay");
 const resultCardEl = document.getElementById("resultCard");
 const resultIconEl = document.getElementById("resultIcon");
 const resultTitleEl = document.getElementById("resultTitle");
@@ -401,18 +508,16 @@ const reloadBtnEl = document.getElementById("reloadBtn");
 const errorMessageEl = document.getElementById("errorMessage");
 
 let currentQuestion = null;
+let activeSlotIndex = 0;
+let markSlotsData = [];
 
 function switchScreen(targetScreenName) {
   Object.keys(screens).forEach((name) => {
-    if (name === targetScreenName) {
-      screens[name].classList.add("active");
-    } else {
-      screens[name].classList.remove("active");
-    }
+    if (name === targetScreenName) screens[name].classList.add("active");
+    else screens[name].classList.remove("active");
   });
 }
 
-// 1. 小テスト一覧の取得 (google.script.run)
 function fetchQuestionList() {
   loadingMessageEl.textContent = "小テスト一覧を読み込んでいます...";
   switchScreen("loading");
@@ -426,14 +531,14 @@ function fetchQuestionList() {
       })
       .getQuestionListServer();
   } else {
-    // デモ用フォールバック
     renderQuestionList([
-      { questionId: "q001", round: "第1回", title: "2次関数の頂点", type: "4択" }
+      { questionId: "q001", round: "第1回", title: "2次関数の頂点", type: "4択", isPassed: true },
+      { questionId: "q002", round: "第2回", title: "判別式", type: "2択", isPassed: false },
+      { questionId: "q003", round: "第3回", title: "三角比の基本", type: "マーク式", isPassed: false }
     ]);
   }
 }
 
-// 2. 問題データの取得
 function fetchQuestion(questionId) {
   loadingMessageEl.textContent = "問題を読み込んでいます...";
   switchScreen("loading");
@@ -449,10 +554,9 @@ function fetchQuestion(questionId) {
   }
 }
 
-// 3. 解答送信
 function submitAnswer(selectedChoice) {
   submittingOverlayEl.classList.remove("hidden");
-  const buttons = choicesContainerEl.querySelectorAll("button");
+  const buttons = document.querySelectorAll(".choice-btn, .keypad-btn, .mark-submit-btn");
   buttons.forEach(btn => btn.disabled = true);
 
   if (typeof google !== "undefined" && google.script && google.script.run) {
@@ -462,12 +566,12 @@ function submitAnswer(selectedChoice) {
         alert(`解答送信エラー: ${err.message}`);
         submittingOverlayEl.classList.add("hidden");
         buttons.forEach(btn => btn.disabled = false);
+        updateMarkSubmitBtnState();
       })
       .submitAnswerServer(currentQuestion.questionId, selectedChoice);
   }
 }
 
-// 4. 一覧描画
 function renderQuestionList(questions) {
   quizListContainerEl.innerHTML = "";
 
@@ -483,16 +587,25 @@ function renderQuestionList(questions) {
 
   questions.forEach((q) => {
     const card = document.createElement("div");
-    card.className = "quiz-card";
+    card.className = q.isPassed ? "quiz-card passed" : "quiz-card";
+
+    const statusBadgeHtml = q.isPassed
+      ? `<span class="status-badge passed-badge">合格済み 🎉</span>`
+      : `<span class="status-badge unpassed-badge">未挑戦</span>`;
+
+    const actionText = q.isPassed
+      ? `<span>合格済み ✅</span><span>➔</span>`
+      : `<span>挑戦する</span><span>➔</span>`;
+
     card.innerHTML = `
       <div class="quiz-card-info">
         <span class="round-badge">${escapeHtml(q.round || "小テスト")}</span>
+        ${statusBadgeHtml}
         <span class="quiz-card-title">${escapeHtml(q.title || "")}</span>
-        <span class="quiz-card-type">${escapeHtml(q.type || "4択")}</span>
+        <span class="quiz-card-type">${escapeHtml(q.type || "")}</span>
       </div>
       <div class="quiz-card-action">
-        <span>挑戦する</span>
-        <span>➔</span>
+        ${actionText}
       </div>
     `;
     card.addEventListener("click", () => fetchQuestion(q.questionId));
@@ -502,7 +615,6 @@ function renderQuestionList(questions) {
   switchScreen("list");
 }
 
-// 5. 出題描画
 function renderQuestion(questionData) {
   currentQuestion = questionData;
   questionNumberEl.textContent = questionData.questionTitle || questionData.round || "小テスト";
@@ -522,15 +634,35 @@ function renderQuestion(questionData) {
       questionImageEl.style.opacity = "1";
     };
     questionImageEl.onerror = () => {
-      imageLoaderEl.innerHTML = `<span style="color:#ef4444;">画像の読み込みに失敗しました（Googleドライブの共有設定を確認してください）</span>`;
+      imageLoaderEl.innerHTML = `<span style="color:#ef4444;">画像の読み込みに失敗しました</span>`;
     };
     questionImageEl.src = questionData.imageUrl;
   }
 
+  const typeStr = String(questionData.type || "");
+  const isMarkType = typeStr.includes("マーク") || typeStr.includes("穴埋め");
+
+  if (isMarkType) {
+    choicesContainerEl.classList.add("hidden");
+    markContainerEl.classList.remove("hidden");
+    questionInstructionEl.textContent = "マーク枠をタップして、数字または符号を入力してください";
+    setupMarkUI(questionData.choices);
+  } else {
+    markContainerEl.classList.add("hidden");
+    choicesContainerEl.classList.remove("hidden");
+    questionInstructionEl.textContent = "正しい選択肢を1つ選んでください";
+    setupChoiceButtons(questionData.choices);
+  }
+
+  submittingOverlayEl.classList.add("hidden");
+  switchScreen("question");
+}
+
+function setupChoiceButtons(choices) {
   choicesContainerEl.innerHTML = "";
   const choiceLabels = ["A", "B", "C", "D", "E", "F"];
 
-  questionData.choices.forEach((choiceText, index) => {
+  choices.forEach((choiceText, index) => {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "choice-btn";
@@ -553,12 +685,99 @@ function renderQuestion(questionData) {
 
     choicesContainerEl.appendChild(btn);
   });
-
-  submittingOverlayEl.classList.add("hidden");
-  switchScreen("question");
 }
 
-// 6. 結果描画
+function setupMarkUI(slotLabels) {
+  markSlotsWrapperEl.innerHTML = "";
+  const defaultLabels = ["ア", "イ", "ウ", "エ", "オ", "カ"];
+  const labels = (slotLabels && slotLabels.length > 0) ? slotLabels : ["ア", "イ"];
+
+  markSlotsData = labels.map((label, idx) => ({
+    label: label || defaultLabels[idx] || `枠${idx+1}`,
+    value: ""
+  }));
+
+  activeSlotIndex = 0;
+  renderMarkSlots();
+  updateMarkSubmitBtnState();
+}
+
+function renderMarkSlots() {
+  markSlotsWrapperEl.innerHTML = "";
+  markSlotsData.forEach((slot, index) => {
+    const slotEl = document.createElement("div");
+    slotEl.className = "mark-slot" + (index === activeSlotIndex ? " active" : "");
+
+    slotEl.innerHTML = `
+      <span class="mark-slot-label">${escapeHtml(slot.label)}</span>
+      <span class="mark-slot-value">${slot.value !== "" ? escapeHtml(slot.value) : "　"}</span>
+    `;
+
+    slotEl.addEventListener("click", () => {
+      activeSlotIndex = index;
+      renderMarkSlots();
+    });
+
+    markSlotsWrapperEl.appendChild(slotEl);
+  });
+}
+
+function inputMarkKey(key) {
+  if (markSlotsData.length === 0) return;
+
+  if (key === "backspace") {
+    if (markSlotsData[activeSlotIndex].value !== "") {
+      markSlotsData[activeSlotIndex].value = "";
+    } else if (activeSlotIndex > 0) {
+      activeSlotIndex--;
+      markSlotsData[activeSlotIndex].value = "";
+    }
+  } else {
+    markSlotsData[activeSlotIndex].value = key;
+    if (activeSlotIndex < markSlotsData.length - 1) {
+      activeSlotIndex++;
+    }
+  }
+
+  renderMarkSlots();
+  updateMarkSubmitBtnState();
+}
+
+function updateMarkSubmitBtnState() {
+  const allFilled = markSlotsData.length > 0 && markSlotsData.every(s => s.value !== "");
+  markSubmitBtnEl.disabled = !allFilled;
+}
+
+markKeypadEl.querySelectorAll(".keypad-btn").forEach(btn => {
+  btn.addEventListener("click", (e) => {
+    e.preventDefault();
+    inputMarkKey(btn.getAttribute("data-key"));
+  });
+});
+
+window.addEventListener("keydown", (e) => {
+  if (!screens.question.classList.contains("active") || markContainerEl.classList.contains("hidden")) {
+    return;
+  }
+  const key = e.key;
+  if (/^[0-9]$/.test(key)) {
+    inputMarkKey(key);
+  } else if (key === "-" || key === "−") {
+    inputMarkKey("-");
+  } else if (key === "Backspace" || key === "Delete") {
+    inputMarkKey("backspace");
+  } else if (key === "Enter" && !markSubmitBtnEl.disabled) {
+    submitMarkAnswer();
+  }
+});
+
+function submitMarkAnswer() {
+  const answerString = markSlotsData.map(s => s.value).join(", ");
+  submitAnswer(answerString);
+}
+
+markSubmitBtnEl.addEventListener("click", submitMarkAnswer);
+
 function renderResult(result) {
   submittingOverlayEl.classList.add("hidden");
   switchScreen("result");
@@ -587,7 +806,6 @@ function escapeHtml(str) {
   return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
 }
 
-// 7. キャンバス演出
 const canvas = document.getElementById("effectCanvas");
 const ctx = canvas.getContext("2d");
 let particles = [];
@@ -656,7 +874,6 @@ function fireRippleEffect() {
   if (!animationFrameId) runParticleLoop();
 }
 
-// イベントリスナー
 backToListFromQuestionBtnEl.addEventListener("click", fetchQuestionList);
 backToListFromResultBtnEl.addEventListener("click", fetchQuestionList);
 retryBtnEl.addEventListener("click", () => {
@@ -665,7 +882,6 @@ retryBtnEl.addEventListener("click", () => {
 });
 reloadBtnEl.addEventListener("click", fetchQuestionList);
 
-// 起動
 window.addEventListener("DOMContentLoaded", fetchQuestionList);
   </script>
 </body>

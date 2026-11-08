@@ -58,7 +58,6 @@ body {
   z-index: 10;
 }
 
-/* ヘッダー */
 .app-header {
   text-align: center;
 }
@@ -81,7 +80,6 @@ body {
   color: #0f172a;
 }
 
-/* メインカード */
 .main-card {
   background: var(--card-bg);
   border-radius: var(--border-radius);
@@ -95,7 +93,6 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.8);
 }
 
-/* 画面切り替え共通設定 */
 .screen {
   display: none;
   flex-direction: column;
@@ -139,19 +136,6 @@ body {
   padding-right: 4px;
 }
 
-/* カスタムスクロールバー */
-.quiz-list-container::-webkit-scrollbar {
-  width: 6px;
-}
-.quiz-list-container::-webkit-scrollbar-track {
-  background: #f1f5f9;
-  border-radius: 10px;
-}
-.quiz-list-container::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 10px;
-}
-
 .quiz-card {
   background-color: #ffffff;
   border: 2px solid var(--border-color);
@@ -174,11 +158,21 @@ body {
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.12);
 }
 
+.quiz-card.passed {
+  border-color: #a7f3d0;
+  background-color: #f0fdf4;
+}
+.quiz-card.passed:hover {
+  border-color: var(--success-color);
+  background-color: #ecfdf5;
+}
+
 .quiz-card-info {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   flex: 1;
+  flex-wrap: wrap;
 }
 
 .round-badge {
@@ -189,6 +183,23 @@ body {
   padding: 6px 10px;
   border-radius: 8px;
   white-space: nowrap;
+}
+
+.status-badge {
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 4px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.status-badge.passed-badge {
+  background-color: #d1fae5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+.status-badge.unpassed-badge {
+  background-color: #f1f5f9;
+  color: var(--text-sub);
 }
 
 .quiz-card-title {
@@ -212,6 +223,10 @@ body {
   display: flex;
   align-items: center;
   gap: 4px;
+  white-space: nowrap;
+}
+.quiz-card.passed .quiz-card-action {
+  color: var(--success-color);
 }
 
 /* 1. ローディング画面 */
@@ -301,8 +316,8 @@ body {
 /* 問題画像表示エリア */
 .image-container {
   width: 100%;
-  min-height: 220px;
-  max-height: 380px;
+  min-height: 200px;
+  max-height: 360px;
   background-color: #f8fafc;
   border: 2px dashed #cbd5e1;
   border-radius: 12px;
@@ -310,14 +325,14 @@ body {
   justify-content: center;
   align-items: center;
   padding: 16px;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
   position: relative;
   overflow: hidden;
 }
 
 .image-container img {
   max-width: 100%;
-  max-height: 340px;
+  max-height: 320px;
   object-fit: contain;
   border-radius: 8px;
   transition: opacity 0.3s ease;
@@ -335,25 +350,23 @@ body {
   text-align: center;
 }
 
-.image-loader .spinner-small {
-  border-color: #cbd5e1;
-  border-top-color: var(--primary-color);
-}
-
-/* 4つの選択肢ボタン */
+/* A. 選択肢ボタンエリア（2〜6択） */
 .choices-container {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
   gap: 14px;
-  position: relative;
+}
+
+.choices-container.hidden {
+  display: none;
 }
 
 .choice-btn {
   background-color: #ffffff;
   border: 2px solid var(--border-color);
   border-radius: 12px;
-  padding: 16px 20px;
-  font-size: 1.1rem;
+  padding: 14px 18px;
+  font-size: 1.05rem;
   font-weight: 600;
   color: var(--text-main);
   cursor: pointer;
@@ -403,16 +416,140 @@ body {
   transform: translateY(0);
 }
 
-/* ボタン無効化時 */
 .choice-btn:disabled {
   cursor: not-allowed;
   opacity: 0.65;
 }
 
-/* 選択されたボタンのハイライト */
 .choice-btn.selected {
   border-color: var(--primary-color);
   background-color: #dbeafe;
+}
+
+/* B. マーク式入力エリア（穴埋めスロット） */
+.mark-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: center;
+}
+
+.mark-container.hidden {
+  display: none;
+}
+
+.mark-instruction {
+  font-size: 0.85rem;
+  color: var(--text-sub);
+  text-align: center;
+}
+
+.mark-slots-wrapper {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  flex-wrap: wrap;
+  width: 100%;
+}
+
+.mark-slot {
+  display: flex;
+  align-items: center;
+  background-color: #ffffff;
+  border: 2px solid var(--border-color);
+  border-radius: 12px;
+  padding: 8px 16px;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+  min-width: 90px;
+}
+
+.mark-slot.active {
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.25);
+  transform: scale(1.05);
+}
+
+.mark-slot-label {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--primary-dark);
+}
+
+.mark-slot-value {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--text-main);
+  min-width: 24px;
+  height: 36px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-bottom: 2px solid #cbd5e1;
+}
+
+.mark-slot.active .mark-slot-value {
+  border-bottom-color: var(--primary-color);
+}
+
+/* テンキーパレット */
+.mark-keypad {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+  max-width: 480px;
+  width: 100%;
+}
+
+.keypad-btn {
+  background-color: #f8fafc;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 12px 6px;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow: var(--shadow-sm);
+  outline: none;
+  user-select: none;
+}
+
+.keypad-btn:hover {
+  background-color: #eff6ff;
+  border-color: var(--primary-color);
+  transform: translateY(-2px);
+}
+
+.keypad-btn:active {
+  transform: translateY(0);
+}
+
+.keypad-btn.delete-btn {
+  grid-column: span 2;
+  font-size: 0.95rem;
+  background-color: #fee2e2;
+  color: #991b1b;
+  border-color: #fca5a5;
+}
+.keypad-btn.delete-btn:hover {
+  background-color: #fecaca;
+}
+
+.mark-submit-btn {
+  width: 100%;
+  max-width: 360px;
+  margin-top: 6px;
+}
+
+.mark-submit-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
 }
 
 /* 送信中オーバーレイ */
@@ -626,31 +763,31 @@ body {
   display: none;
 }
 
-/* レスポンシブ対応（画面幅が狭い場合） */
 @media (max-width: 600px) {
   .choices-container {
-    grid-template-columns: 1fr; /* 1列並び */
+    grid-template-columns: 1fr;
   }
-
   .main-card {
     padding: 18px;
   }
-
   .app-title {
     font-size: 1.4rem;
   }
-
   .result-title {
     font-size: 1.8rem;
   }
-
   .quiz-card {
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
   }
-
   .quiz-card-action {
     align-self: flex-end;
+  }
+  .mark-keypad {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  .keypad-btn.delete-btn {
+    grid-column: span 1;
   }
 }
