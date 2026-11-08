@@ -1,11 +1,8 @@
-/**
- * ========================================================
- * 数学小テスト 問題作成スタジオ ロジック v3.0 (creator.js)
- * GAS (HtmlService Strict CSP iframe) / ローカル両対応・完全版
- * ※ GASのCSP仕様により、HTML側インラインイベント属性 (onclick等) は使わず
- *    すべて addEventListener でイベントを登録する
- * ========================================================
- */
+// ========================================================
+// 数学小テスト 問題作成スタジオ ロジック v3.1 (creator.js)
+// GAS (HtmlService iframe) / ローカル両対応・完全版
+// 生徒用画面 (index.html) と同一の純粋ES構文・addEventListener統一構成
+// ========================================================
 
 const STORAGE_KEY_API = "quick_quiz_gemini_api_key";
 const STORAGE_KEY_FOLDER = "quick_quiz_drive_folder_url";
@@ -16,6 +13,7 @@ let currentGeneratedData = null;
 let isAppInitialized = false;
 let dragDepth = 0;
 let lastHandledPasteEvent = null;
+let assetsLoadingStarted = false;
 
 function el(id) {
   return document.getElementById(id);
@@ -50,25 +48,22 @@ function setVersionBadge(text, stateClass) {
   if (stateClass) badge.classList.add(stateClass);
 }
 
-function setPasteStatus(msg, isWarn) {
+function setPasteStatus(msg, mode) {
   const statusEl = el("pasteStatusMsg");
   if (!statusEl) return;
+  statusEl.classList.remove("hidden", "warn", "ready", "error");
   if (!msg) {
     statusEl.textContent = "";
     statusEl.classList.add("hidden");
-    statusEl.classList.remove("warn");
     return;
   }
   statusEl.textContent = msg;
-  statusEl.classList.remove("hidden");
-  if (isWarn) {
-    statusEl.classList.add("warn");
-  } else {
-    statusEl.classList.remove("warn");
+  if (mode === "warn" || mode === "ready" || mode === "error") {
+    statusEl.classList.add(mode);
   }
 }
 
-function focusPasteBox(statusMsg, isWarn) {
+function focusPasteBox(statusMsg, mode) {
   const box = el("pasteCatcherBox");
   if (!box) return;
   box.innerHTML = "";
@@ -86,7 +81,7 @@ function focusPasteBox(statusMsg, isWarn) {
     }
   } catch (e) {}
   if (statusMsg !== undefined) {
-    setPasteStatus(statusMsg, Boolean(isWarn));
+    setPasteStatus(statusMsg, mode || "info");
   }
 }
 
@@ -97,20 +92,127 @@ function resetPasteBoxState() {
     box.classList.remove("paste-ready");
     box.setAttribute("data-placeholder", "💡 ここをクリックして Ctrl + V（または右クリック→貼り付け）");
   }
-  setPasteStatus("", false);
+  setPasteStatus("🟢 動作準備OK (v3.1) — ファイル選択 / D&D / Ctrl+V すべて対応", "ready");
+}
+
+// ==========================================
+// 外部ライブラリ（KaTeX / html2canvas）の非同期遅延読み込み
+// ※ 静的headでの外部通信ブロックによるUI起動停止を絶対に防ぐ
+// ==========================================
+function loadCssWithFallback(urls, idx) {
+  if (idx >= urls.length) return;
+  try {
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = urls[idx];
+    link.onerror = function () {
+      loadCssWithFallback(urls, idx + 1);
+    };
+    (document.head || document.getElementsByTagName("head")[0] || document.documentElement).appendChild(link);
+  } catch (e) {}
+}
+
+function loadScriptWithFallback(urls, idx, onDone) {
+  if (idx >= urls.length) {
+    if (onDone) onDone(false);
+    return;
+  }
+  try {
+    const sc = document.createElement("script");
+    sc.src = urls[idx];
+    sc.async = true;
+    sc.onload = function () {
+      if (onDone) onDone(true);
+    };
+    sc.onerror = function () {
+      loadScriptWithFallback(urls, idx + 1, onDone);
+    };
+    (document.head || document.getElementsByTagName("head")[0] || document.documentElement).appendChild(sc);
+  } catch (e) {
+    if (onDone) onDone(false);
+  }
+}
+
+function loadExternalAssets() {
+  if (assetsLoadingStarted) return;
+  assetsLoadingStarted = true;
+
+  loadCssWithFallback([
+    "https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css",
+    "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css",
+    "https://unpkg.com/katex@0.16.9/dist/katex.min.css"
+  ], 0);
+
+  loadScriptWithFallback([
+    "https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js",
+    "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js",
+    "https://unpkg.com/katex@0.16.9/dist/katex.min.js"
+  ], 0, function (loaded) {
+    if (loaded) {
+      loadScriptWithFallback([
+        "https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/contrib/auto-render.min.js",
+        "https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js",
+        "https://unpkg.com/katex@0.16.9/dist/contrib/auto-render.min.js"
+      ], 0, function () {
+        if (currentGeneratedData) {
+          const pc = el("problemCardContent");
+          const ec = el("explanationCardContent");
+          if (pc) renderMath(pc);
+          if (ec) renderMath(ec);
+        }
+      });
+    }
+  });
+
+  loadScriptWithFallback([
+    "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js",
+    "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js",
+    "https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"
+  ], 0);
+}
+
+function ensureHtml2Canvas() {
+  if (typeof html2canvas === "function") {
+    return Promise.resolve();
+  }
+  return new Promise(function (resolve, reject) {
+    loadScriptWithFallback([
+      "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js",
+      "https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js",
+      "https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js"
+    ], 0, function (ok) {
+      if (ok && typeof html2canvas === "function") {
+        resolve();
+      } else {
+        reject(new Error("画像変換ライブラリ(html2canvas)を読み込めませんでした。ネットワーク接続を確認してください。"));
+      }
+    });
+  });
 }
 
 // ==========================================
 // 1. 初期ロード & イベント登録（完全CSP準拠）
 // ==========================================
-function initSettings() {
+function syncSettingsNotices() {
   const apiKeyInput = el("apiKeyInput");
   const apiSavedNotice = el("apiSavedNotice");
   const driveFolderUrlInput = el("driveFolderUrlInput");
   const folderSavedNotice = el("folderSavedNotice");
+
+  if (apiSavedNotice) {
+    apiSavedNotice.style.display = (apiKeyInput && apiKeyInput.value.trim()) ? "inline-block" : "none";
+  }
+  if (folderSavedNotice) {
+    folderSavedNotice.style.display = (driveFolderUrlInput && driveFolderUrlInput.value.trim()) ? "inline-block" : "none";
+  }
+  checkReadyToGenerate();
+}
+
+function initSettings() {
+  const apiKeyInput = el("apiKeyInput");
+  const driveFolderUrlInput = el("driveFolderUrlInput");
   const studentAppLink = el("studentAppLink");
 
-  // GAS環境内の場合は「生徒用テスト画面を開く」リンクをWebアプリTOPに向ける
   if (studentAppLink && typeof google !== "undefined" && google.script) {
     studentAppLink.href = DEFAULT_GAS_URL;
   }
@@ -119,19 +221,13 @@ function initSettings() {
   if (savedApiKey && apiKeyInput && !apiKeyInput.value) {
     apiKeyInput.value = savedApiKey;
   }
-  if (apiSavedNotice) {
-    apiSavedNotice.style.display = (apiKeyInput && apiKeyInput.value.trim()) ? "inline-block" : "none";
-  }
 
   const savedFolderUrl = safeStorage.get(STORAGE_KEY_FOLDER);
   if (savedFolderUrl && driveFolderUrlInput && !driveFolderUrlInput.value) {
     driveFolderUrlInput.value = savedFolderUrl;
   }
-  if (folderSavedNotice) {
-    folderSavedNotice.style.display = (driveFolderUrlInput && driveFolderUrlInput.value.trim()) ? "inline-block" : "none";
-  }
 
-  checkReadyToGenerate();
+  syncSettingsNotices();
 }
 
 function initCreatorApp() {
@@ -142,6 +238,7 @@ function initCreatorApp() {
 
     const fileInput = el("fileInput");
     const dropZone = el("dropZone");
+    const inputPanel = document.querySelector(".input-panel");
     const clipPasteBtn = el("clipPasteBtn");
     const pasteCatcherBox = el("pasteCatcherBox");
     const clearImgBtn = el("clearImgBtn");
@@ -153,7 +250,6 @@ function initCreatorApp() {
     const manualCopyBtn = el("manualCopyBtn");
 
     if (!fileInput || !dropZone || !pasteCatcherBox) {
-      // DOM構築前なら後続イベントで再実行
       return;
     }
 
@@ -163,6 +259,7 @@ function initCreatorApp() {
     if (apiKeyInput) {
       apiKeyInput.addEventListener("input", handleApiKeyInput);
       apiKeyInput.addEventListener("change", handleApiKeyInput);
+      apiKeyInput.addEventListener("blur", syncSettingsNotices);
     }
     if (toggleApiVisibilityBtn) {
       toggleApiVisibilityBtn.addEventListener("click", handleToggleApiVis);
@@ -170,6 +267,7 @@ function initCreatorApp() {
     if (driveFolderUrlInput) {
       driveFolderUrlInput.addEventListener("input", handleFolderUrlInput);
       driveFolderUrlInput.addEventListener("change", handleFolderUrlInput);
+      driveFolderUrlInput.addEventListener("blur", syncSettingsNotices);
     }
 
     // 2) ファイル選択 input
@@ -184,10 +282,10 @@ function initCreatorApp() {
       clipPasteBtn.addEventListener("click", handlePasteButtonClick);
     }
 
-    // 4) contenteditable ペースト受信ボックス
+    // 4) contenteditable ペースト受信ボックス（直接貼付 + DOM監視フォールバック）
     pasteCatcherBox.addEventListener("click", function (e) {
       e.stopPropagation();
-      focusPasteBox("⌨️ ここにカーソルが合いました！そのまま Ctrl + V（または右クリック→貼り付け）してください", false);
+      focusPasteBox("⌨️ ここにカーソルが合いました！そのまま Ctrl + V（または右クリック→貼り付け）してください", "info");
     });
     pasteCatcherBox.addEventListener("focus", function () {
       pasteCatcherBox.classList.add("paste-ready");
@@ -197,22 +295,31 @@ function initCreatorApp() {
     });
     pasteCatcherBox.addEventListener("paste", function (e) {
       handlePasteEvent(e);
-      setTimeout(handlePasteBoxDomFallback, 60);
+      setTimeout(handlePasteBoxDomFallback, 50);
     });
     pasteCatcherBox.addEventListener("input", function () {
       handlePasteBoxDomFallback();
     });
 
+    if (typeof MutationObserver === "function") {
+      try {
+        const observer = new MutationObserver(function () {
+          handlePasteBoxDomFallback();
+        });
+        observer.observe(pasteCatcherBox, { childList: true, subtree: true });
+      } catch (e) {}
+    }
+
     // 5) 画面全体の Ctrl + V もキャッチ
     document.addEventListener("paste", handlePasteEvent);
     window.addEventListener("paste", handlePasteEvent);
 
-    // 6) ドラッグ＆ドロップ（ページ遷移抑止 + ドロップゾーン処理）
-    ["dragover", "drop"].forEach((evt) => {
-      window.addEventListener(evt, (e) => {
+    // 6) ドラッグ＆ドロップ（ページ遷移抑止 + ドロップゾーン/左パネル全体受付）
+    ["dragover", "drop"].forEach(function (evt) {
+      window.addEventListener(evt, function (e) {
         e.preventDefault();
       }, false);
-      document.addEventListener(evt, (e) => {
+      document.addEventListener(evt, function (e) {
         e.preventDefault();
       }, false);
     });
@@ -243,6 +350,12 @@ function initCreatorApp() {
     });
 
     dropZone.addEventListener("drop", handleDropFile);
+    if (inputPanel) {
+      inputPanel.addEventListener("dragover", function (e) {
+        e.preventDefault();
+      });
+      inputPanel.addEventListener("drop", handleDropFile);
+    }
 
     // 7) 画像削除・AI生成・エクスポート・手動コピー
     if (clearImgBtn) {
@@ -258,16 +371,29 @@ function initCreatorApp() {
       manualCopyBtn.addEventListener("click", handleManualCopyClick);
     }
 
-    setVersionBadge("教員用ツール v3.0 (🟢 動作準備OK)", "badge-ready");
+    setVersionBadge("教員用ツール v3.1 (🟢 動作準備OK)", "badge-ready");
+    setPasteStatus("🟢 動作準備OK (v3.1) — ファイル選択 / D&D / Ctrl+V すべて対応", "ready");
+
+    // ブラウザの遅延自動入力（オートフィル）対策
+    [300, 1000, 2500].forEach(function (delay) {
+      setTimeout(syncSettingsNotices, delay);
+    });
+
+    // UI起動完了後に数式・画像変換ライブラリを非同期読み込み
+    setTimeout(loadExternalAssets, 50);
   } catch (err) {
+    const msg = err && err.message ? err.message : String(err);
     console.error("Creator init error:", err);
-    setVersionBadge("教員用ツール v3.0 (🔴 起動エラー: " + err.message + ")", "badge-error");
+    setVersionBadge("教員用ツール v3.1 (🔴 起動エラー: " + msg + ")", "badge-error");
+    setPasteStatus("🔴 起動エラー: " + msg, "error");
   }
 }
 
 window.addEventListener("error", function (e) {
   if (!isAppInitialized) {
-    setVersionBadge("教員用ツール v3.0 (🔴 エラー: " + (e.message || "不明") + ")", "badge-error");
+    const msg = (e && e.message) ? e.message : "不明なエラー";
+    setVersionBadge("教員用ツール v3.1 (🔴 エラー: " + msg + ")", "badge-error");
+    setPasteStatus("🔴 エラー: " + msg, "error");
   }
 });
 
@@ -277,25 +403,22 @@ if (document.readyState === "loading") {
   initCreatorApp();
 }
 window.addEventListener("load", initCreatorApp);
-setTimeout(initCreatorApp, 150);
+setTimeout(initCreatorApp, 100);
 
 // ==========================================
 // 設定入力ハンドラ
 // ==========================================
 function handleApiKeyInput() {
   const apiKeyInput = el("apiKeyInput");
-  const apiSavedNotice = el("apiSavedNotice");
   if (!apiKeyInput) return;
 
   const key = apiKeyInput.value.trim();
   if (key) {
     safeStorage.set(STORAGE_KEY_API, key);
-    if (apiSavedNotice) apiSavedNotice.style.display = "inline-block";
   } else {
     safeStorage.remove(STORAGE_KEY_API);
-    if (apiSavedNotice) apiSavedNotice.style.display = "none";
   }
-  checkReadyToGenerate();
+  syncSettingsNotices();
 }
 
 function handleToggleApiVis() {
@@ -314,17 +437,15 @@ function handleToggleApiVis() {
 
 function handleFolderUrlInput() {
   const driveFolderUrlInput = el("driveFolderUrlInput");
-  const folderSavedNotice = el("folderSavedNotice");
   if (!driveFolderUrlInput) return;
 
   const url = driveFolderUrlInput.value.trim();
   if (url) {
     safeStorage.set(STORAGE_KEY_FOLDER, url);
-    if (folderSavedNotice) folderSavedNotice.style.display = "inline-block";
   } else {
     safeStorage.remove(STORAGE_KEY_FOLDER);
-    if (folderSavedNotice) folderSavedNotice.style.display = "none";
   }
+  syncSettingsNotices();
 }
 
 // ==========================================
@@ -363,7 +484,9 @@ function handleImageFile(file, sourceInputEl) {
 
   const reader = new FileReader();
   reader.onload = function (e) {
-    setSourceImageDataUrl(e.target.result);
+    if (e && e.target && e.target.result) {
+      setSourceImageDataUrl(e.target.result);
+    }
   };
   reader.onerror = function () {
     alert("画像の読み込みに失敗しました。もう一度お試しください。");
@@ -377,31 +500,30 @@ function handleImageFile(file, sourceInputEl) {
 }
 
 // ② 「📋 スクショを貼り付け」ボタンクリック
-async function handlePasteButtonClick(e) {
+function handlePasteButtonClick(e) {
   if (e) e.stopPropagation();
 
   if (navigator.clipboard && typeof navigator.clipboard.read === "function") {
-    try {
-      const clipboardItems = await navigator.clipboard.read();
-      for (const item of clipboardItems) {
-        const imageType = item.types.find(type => type.startsWith("image/"));
+    navigator.clipboard.read().then(function (clipboardItems) {
+      for (let i = 0; i < clipboardItems.length; i++) {
+        const item = clipboardItems[i];
+        const imageType = item.types.find(function (t) { return t.startsWith("image/"); });
         if (imageType) {
-          const blob = await item.getType(imageType);
-          if (blob) {
-            handleImageFile(blob);
-            return;
-          }
+          item.getType(imageType).then(function (blob) {
+            if (blob) handleImageFile(blob);
+          });
+          return;
         }
       }
-      focusPasteBox("⚠️ クリップボードに画像が見つかりません。画面切り取り（Win+Shift+S 等）で画像をコピー後、ここで Ctrl + V してください。", true);
-      return;
-    } catch (err) {
+      focusPasteBox("⚠️ クリップボードに画像が見つかりません。画面切り取り（Win+Shift+S 等）で画像をコピー後、ここで Ctrl + V してください。", "warn");
+    }).catch(function () {
       // GAS iframe では Permissions-Policy で clipboard.read() がブロックされるのが正常動作
-      console.warn("Clipboard API blocked, focusing contenteditable paste box:", err);
-    }
+      focusPasteBox("⌨️ ここにカーソルが合いました！そのままキーボードの「Ctrl + V」を押してください！（右クリック→貼り付けも可）", "info");
+    });
+    return;
   }
 
-  focusPasteBox("⌨️ ここにカーソルが合いました！そのままキーボードの「Ctrl + V」を押してください！", false);
+  focusPasteBox("⌨️ ここにカーソルが合いました！そのままキーボードの「Ctrl + V」を押してください！（右クリック→貼り付けも可）", "info");
 }
 
 // ③ Ctrl + V ペーストイベント（clipboardData.files / items を優先取得）
@@ -456,7 +578,7 @@ function handlePasteEvent(e) {
   }
 }
 
-// contenteditable ボックス内に直接 <img> が挿入された場合のフォールバック + 非画像テキスト掃除
+// contenteditable ボックス内に直接画像要素が挿入された場合のフォールバック + 非画像テキスト掃除
 function handlePasteBoxDomFallback() {
   const box = el("pasteCatcherBox");
   if (!box) return;
@@ -469,23 +591,24 @@ function handlePasteBoxDomFallback() {
       setSourceImageDataUrl(src);
       return;
     }
-    if (src.startsWith("blob:")) {
+    if (src.startsWith("blob:") || src.startsWith("http://") || src.startsWith("https://")) {
       fetch(src)
-        .then(r => r.blob())
-        .then(blob => handleImageFile(blob))
-        .catch(() => {
-          setPasteStatus("⚠️ 画像データの取得に失敗しました。ファイル選択またはドラッグ＆ドロップをお試しください。", true);
+        .then(function (r) { return r.blob(); })
+        .then(function (blob) { handleImageFile(blob); })
+        .catch(function () {
+          setPasteStatus("⚠️ 画像データの取得に失敗しました。スクショ（Win+Shift+S）または「📁 ファイルを選択」をお試しください。", "warn");
         });
       return;
     }
+    setPasteStatus("⚠️ 貼り付けた画像形式を読み込めませんでした。スクショ（Win+Shift+S）または「📁 ファイルを選択」をお試しください。", "warn");
+    return;
   }
 
-  // 画像以外の文字が入力/ペーストされたらクリアして案内
   if (box.innerHTML !== "") {
     const hadText = (box.textContent || "").trim().length > 0;
     box.innerHTML = "";
     if (hadText) {
-      setPasteStatus("⚠️ 文字ではなく「画像（スクショ）」をコピーした状態で Ctrl + V してください。", true);
+      setPasteStatus("⚠️ 文字ではなく「画像（スクショ）」をコピーした状態で Ctrl + V してください。", "warn");
     }
   }
 }
@@ -558,7 +681,32 @@ function checkReadyToGenerate() {
 // ==========================================
 // 3. Gemini API による解析・改題・生成
 // ==========================================
-async function handleGenerateClick() {
+function callGeminiWithFallback(modelCandidates, idx, apiKey, requestBody, lastErrorMsg) {
+  if (idx >= modelCandidates.length) {
+    return Promise.reject(new Error("Gemini API エラー: " + (lastErrorMsg || "不明なエラー")));
+  }
+  const model = modelCandidates[idx];
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+
+  return fetch(apiUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(requestBody)
+  }).then(function (res) {
+    if (res.ok) {
+      return res.json();
+    }
+    return res.json().catch(function () { return {}; }).then(function (errJson) {
+      const msg = (errJson && errJson.error && errJson.error.message) ? errJson.error.message : res.statusText;
+      return callGeminiWithFallback(modelCandidates, idx + 1, apiKey, requestBody, msg);
+    });
+  }).catch(function (err) {
+    const msg = err && err.message ? err.message : String(err);
+    return callGeminiWithFallback(modelCandidates, idx + 1, apiKey, requestBody, msg);
+  });
+}
+
+function handleGenerateClick() {
   const apiKeyInput = el("apiKeyInput");
   const customPromptInput = el("customPromptInput");
   const placeholderBox = el("placeholderBox");
@@ -594,126 +742,110 @@ async function handleGenerateClick() {
   if (exportWarningMessage) exportWarningMessage.classList.add("hidden");
   if (manualCopyBox) manualCopyBox.classList.add("hidden");
   if (generateBtn) generateBtn.disabled = true;
+  if (loadingStatusText) loadingStatusText.textContent = "AIが画像を解析し、数式と問題を構成しています...";
 
-  try {
-    if (loadingStatusText) loadingStatusText.textContent = "AIが画像を解析し、数式と問題を構成しています...";
+  const mimeType = currentImageBase64.split(";")[0].split(":")[1];
+  const base64Data = currentImageBase64.split(",")[1];
 
-    const mimeType = currentImageBase64.split(";")[0].split(":")[1];
-    const base64Data = currentImageBase64.split(",")[1];
+  const systemPrompt = [
+    "あなたは日本の高校数学の優秀な教員であり教材作成のスペシャリストです。",
+    "添付された数学の問題画像を読み取り、指定されたルールに従って小テスト用データをJSON形式で出力してください。",
+    "",
+    "【設定条件】",
+    "- 改題モード: " + (remakeMode === "exact" ? "元画像の問題をできるだけ忠実に再現（マーク化/選択肢化のみ行う）" : "元画像の問題を改題（数値を変更した類題を作成）"),
+    "- 出題形式: " + questionType + "（マーク式または選択式）",
+    customPrompt ? ("- 追加指示: " + customPrompt) : "",
+    "",
+    "【数学・表記ルール】",
+    "1. 数式はすべて LaTeX 記法（$ ... $ または $$ ... $$）で美しく記述してください。",
+    "2. マーク式の場合:",
+    "   - 問題文中に穴埋め枠として \\fbox{ ア } や \\fbox{ イ } のようにマーク枠を配置してください。",
+    "   - slotsOrChoices には [\"ア\", \"イ\"] のように使用したマーク枠のカタカナ文字を配列で入れてください。",
+    "   - correctAnswer には \"1, 2\" や \"-, 3\" のようにカンマ区切りで各枠の正解を入れてください。",
+    "3. 選択式の場合:",
+    "   - slotsOrChoices には [\"選択肢Aのテキスト\", \"選択肢Bのテキスト\", \"選択肢Cのテキスト\", \"選択肢Dのテキスト\"] を入れてください（2〜4択）。",
+    "   - correctAnswer には正解の文字（\"A\", \"B\", \"C\", \"D\" のいずれか）を入れてください。",
+    "4. explanationMarkdown には、生徒が読んですぐ理解できる丁寧な途中式とポイント解説を LaTeX を交えて記述してください。",
+    "",
+    "【出力フォーマット】",
+    "以下のJSONフォーマットのみを純粋に出力してください（コードブロック記号は含めないでください）。",
+    "{",
+    "  \"title\": \"単元名・問題タイトル（例: 第◯回 2次関数の決定）\",",
+    "  \"problemMarkdown\": \"問題文の本文（LaTeX数式記法を含む）\",",
+    "  \"type\": \"" + questionType + "\",",
+    "  \"slotsOrChoices\": [\"ア\", \"イ\"],",
+    "  \"correctAnswer\": \"1, 2\",",
+    "  \"explanationMarkdown\": \"解説本文（LaTeX数式記法を含む）\"",
+    "}"
+  ].join("\n");
 
-    const systemPrompt = [
-      "あなたは日本の高校数学の優秀な教員であり教材作成のスペシャリストです。",
-      "添付された数学の問題画像を読み取り、指定されたルールに従って小テスト用データをJSON形式で出力してください。",
-      "",
-      "【設定条件】",
-      "- 改題モード: " + (remakeMode === "exact" ? "元画像の問題をできるだけ忠実に再現（マーク化/選択肢化のみ行う）" : "元画像の問題を改題（数値を変更した類題を作成）"),
-      "- 出題形式: " + questionType + "（マーク式または選択式）",
-      customPrompt ? ("- 追加指示: " + customPrompt) : "",
-      "",
-      "【数学・表記ルール】",
-      "1. 数式はすべて LaTeX 記法（$ ... $ または $$ ... $$）で美しく記述してください。",
-      "2. マーク式の場合:",
-      "   - 問題文中に穴埋め枠として \\fbox{ ア } や \\fbox{ イ } のようにマーク枠を配置してください。",
-      "   - slotsOrChoices には [\"ア\", \"イ\"] のように使用したマーク枠のカタカナ文字を配列で入れてください。",
-      "   - correctAnswer には \"1, 2\" や \"-, 3\" のようにカンマ区切りで各枠の正解を入れてください。",
-      "3. 選択式の場合:",
-      "   - slotsOrChoices には [\"選択肢Aのテキスト\", \"選択肢Bのテキスト\", \"選択肢Cのテキスト\", \"選択肢Dのテキスト\"] を入れてください（2〜4択）。",
-      "   - correctAnswer には正解の文字（\"A\", \"B\", \"C\", \"D\" のいずれか）を入れてください。",
-      "4. explanationMarkdown には、生徒が読んですぐ理解できる丁寧な途中式とポイント解説を LaTeX を交えて記述してください。",
-      "",
-      "【出力フォーマット】",
-      "以下のJSONフォーマットのみを純粋に出力してください（コードブロック記号は含めないでください）。",
-      "{",
-      "  \"title\": \"単元名・問題タイトル（例: 第◯回 2次関数の決定）\",",
-      "  \"problemMarkdown\": \"問題文の本文（LaTeX数式記法を含む）\",",
-      "  \"type\": \"" + questionType + "\",",
-      "  \"slotsOrChoices\": [\"ア\", \"イ\"],",
-      "  \"correctAnswer\": \"1, 2\",",
-      "  \"explanationMarkdown\": \"解説本文（LaTeX数式記法を含む）\"",
-      "}"
-    ].filter(line => line !== null).join("\n");
-
-    const requestBody = {
-      contents: [
-        {
-          parts: [
-            { text: systemPrompt },
-            {
-              inline_data: {
-                mime_type: mimeType,
-                data: base64Data
-              }
+  const requestBody = {
+    contents: [
+      {
+        parts: [
+          { text: systemPrompt },
+          {
+            inline_data: {
+              mime_type: mimeType,
+              data: base64Data
             }
-          ]
-        }
-      ],
-      generationConfig: {
-        temperature: 0.2,
-        response_mime_type: "application/json"
+          }
+        ]
       }
-    };
+    ],
+    generationConfig: {
+      temperature: 0.2,
+      response_mime_type: "application/json"
+    }
+  };
 
-    const modelCandidates = ["gemini-3.8-flash", "gemini-1.5-flash", "gemini-2.0-flash"];
-    let response = null;
-    let lastErrorMsg = "";
+  const modelCandidates = ["gemini-3.8-flash", "gemini-1.5-flash", "gemini-2.0-flash"];
 
-    for (const model of modelCandidates) {
-      const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+  callGeminiWithFallback(modelCandidates, 0, apiKey, requestBody, "")
+    .then(function (responseData) {
+      const candidates = responseData && responseData.candidates;
+      const firstCandidate = (candidates && candidates.length > 0) ? candidates[0] : null;
+      const parts = (firstCandidate && firstCandidate.content && firstCandidate.content.parts) ? firstCandidate.content.parts : null;
+      const candidateText = (parts && parts.length > 0) ? parts[0].text : null;
+
+      if (!candidateText) {
+        throw new Error("AIから応答が得られませんでした。");
+      }
+
+      let parsedData;
       try {
-        const res = await fetch(apiUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(requestBody)
-        });
-        if (res.ok) {
-          response = res;
-          break;
-        } else {
-          const errJson = await res.json().catch(() => ({}));
-          lastErrorMsg = errJson.error?.message || res.statusText;
+        const fence = String.fromCharCode(96, 96, 96);
+        let cleanJson = candidateText.trim();
+        if (cleanJson.toLowerCase().indexOf(fence + "json") === 0) {
+          cleanJson = cleanJson.slice(fence.length + 4).trim();
+        } else if (cleanJson.indexOf(fence) === 0) {
+          cleanJson = cleanJson.slice(fence.length).trim();
         }
-      } catch (err) {
-        lastErrorMsg = err.message;
+        if (cleanJson.endsWith(fence)) {
+          cleanJson = cleanJson.slice(0, -fence.length).trim();
+        }
+        parsedData = JSON.parse(cleanJson);
+      } catch (e) {
+        console.error("JSON parse error:", candidateText);
+        throw new Error("AIの応答をJSONとして解釈できませんでした。もう一度お試しください。");
       }
-    }
 
-    if (!response) {
-      throw new Error(`Gemini API エラー: ${lastErrorMsg}`);
-    }
+      currentGeneratedData = parsedData;
+      renderPreview(parsedData);
 
-    const responseData = await response.json();
-    const candidateText = responseData.candidates?.[0]?.content?.parts?.[0]?.text;
-    if (!candidateText) {
-      throw new Error("AIから応答が得られませんでした。");
-    }
-
-    let parsedData;
-    try {
-      const cleanJson = candidateText
-        .replace(/^\x60\x60\x60json\s*/i, "")
-        .replace(/^\x60\x60\x60\s*/, "")
-        .replace(/\s*\x60\x60\x60$/, "")
-        .trim();
-      parsedData = JSON.parse(cleanJson);
-    } catch (e) {
-      console.error("JSON parse error:", candidateText);
-      throw new Error("AIの応答をJSONとして解釈できませんでした。もう一度お試しください。");
-    }
-
-    currentGeneratedData = parsedData;
-    renderPreview(parsedData);
-
-    if (loadingBox) loadingBox.classList.add("hidden");
-    if (resultArea) resultArea.classList.remove("hidden");
-  } catch (error) {
-    console.error("生成エラー:", error);
-    alert(`生成に失敗しました: ${error.message}`);
-    if (loadingBox) loadingBox.classList.add("hidden");
-    if (placeholderBox) placeholderBox.classList.remove("hidden");
-  } finally {
-    if (generateBtn) generateBtn.disabled = false;
-    checkReadyToGenerate();
-  }
+      if (loadingBox) loadingBox.classList.add("hidden");
+      if (resultArea) resultArea.classList.remove("hidden");
+    })
+    .catch(function (error) {
+      console.error("生成エラー:", error);
+      alert(`生成に失敗しました: ${error.message}`);
+      if (loadingBox) loadingBox.classList.add("hidden");
+      if (placeholderBox) placeholderBox.classList.remove("hidden");
+    })
+    .then(function () {
+      if (generateBtn) generateBtn.disabled = false;
+      checkReadyToGenerate();
+    });
 }
 
 // ==========================================
@@ -747,10 +879,13 @@ function renderPreview(data) {
 
 function formatMarkdownMath(text) {
   if (!text) return "";
-  return text
-    .replace(/\n\n/g, "<br><br>")
-    .replace(/\n/g, "<br>")
-    .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+  const br = "<" + "br>";
+  const stOpen = "<" + "strong>";
+  const stClose = "<" + "/strong>";
+  return String(text)
+    .replace(/\n\n/g, br + br)
+    .replace(/\n/g, br)
+    .replace(/\*\*(.*?)\*\*/g, stOpen + "$1" + stClose);
 }
 
 function renderMath(element) {
@@ -770,18 +905,18 @@ function renderMath(element) {
 // ==========================================
 // 5. ドライブ保存 ＆ スプレッドシート用TSVコピー
 // ==========================================
-async function copyTextSafely(text) {
-  // 1) Clipboard API を試行
+function copyTextSafely(text) {
   if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
-    try {
-      await navigator.clipboard.writeText(text);
+    return navigator.clipboard.writeText(text).then(function () {
       return true;
-    } catch (e) {
-      console.warn("clipboard.writeText blocked, falling back to execCommand:", e);
-    }
+    }).catch(function () {
+      return execCommandCopyFallback(text);
+    });
   }
+  return Promise.resolve(execCommandCopyFallback(text));
+}
 
-  // 2) 非表示 textarea + execCommand("copy") フォールバック
+function execCommandCopyFallback(text) {
   try {
     const ta = document.createElement("textarea");
     ta.value = text;
@@ -796,12 +931,73 @@ async function copyTextSafely(text) {
     document.body.removeChild(ta);
     return Boolean(ok);
   } catch (e) {
-    console.warn("execCommand copy failed:", e);
     return false;
   }
 }
 
-async function handleExportClick() {
+function uploadProblemImage(folderUrl, problemImageBase64) {
+  if (!folderUrl) {
+    return Promise.resolve({
+      url: "",
+      warning: "⚠️ 「画像保存先 Googleドライブ フォルダURL」が未入力のため、問題画像をPCにダウンロード保存しました（URLを入力すると次回からドライブへ自動保存されます）。"
+    });
+  }
+  if (!folderUrl.includes("drive.google.com")) {
+    return Promise.resolve({
+      url: "",
+      warning: "⚠️ GoogleドライブのフォルダURL形式が正しくないため、問題画像をPCにダウンロード保存しました（https://drive.google.com/drive/folders/... のURLを指定してください）。"
+    });
+  }
+
+  if (typeof google !== "undefined" && google.script && google.script.run) {
+    return new Promise(function (resolve) {
+      google.script.run
+        .withSuccessHandler(function (url) {
+          resolve({ url: url || "", warning: "" });
+        })
+        .withFailureHandler(function (err) {
+          const errMsg = (err && err.message) ? err.message : String(err);
+          resolve({
+            url: "",
+            warning: "⚠️ Googleドライブ自動保存に失敗しました（" + errMsg + "）。代わりに画像をPCへダウンロード保存しました。"
+          });
+        })
+        .uploadImageServer(folderUrl, problemImageBase64, `quiz_${Date.now()}.png`);
+    });
+  }
+
+  const uploadPayload = {
+    action: "uploadImage",
+    folderUrl: folderUrl,
+    base64Image: problemImageBase64,
+    filename: `quiz_${Date.now()}.png`
+  };
+
+  return fetch(DEFAULT_GAS_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    redirect: "follow",
+    body: JSON.stringify(uploadPayload)
+  }).then(function (uploadRes) {
+    if (!uploadRes.ok) {
+      throw new Error("HTTP " + uploadRes.status);
+    }
+    return uploadRes.json();
+  }).then(function (resData) {
+    if (resData && resData.imageUrl) {
+      return { url: resData.imageUrl, warning: "" };
+    }
+    throw new Error((resData && resData.error) ? resData.error : "URLが返されませんでした");
+  }).catch(function (err) {
+    const errMsg = (err && err.message) ? err.message : String(err);
+    return {
+      url: "",
+      warning: "⚠️ Googleドライブ自動保存に失敗しました（" + errMsg + "）。代わりに画像をPCへダウンロード保存しました。"
+    };
+  });
+}
+
+function handleExportClick() {
   const driveFolderUrlInput = el("driveFolderUrlInput");
   const resultTitleInput = el("resultTitleInput");
   const choicesInput = el("choicesInput");
@@ -817,7 +1013,7 @@ async function handleExportClick() {
   const folderUrl = driveFolderUrlInput ? driveFolderUrlInput.value.trim() : "";
   const title = (resultTitleInput && resultTitleInput.value.trim()) || "小テスト";
   const type = (currentGeneratedData && currentGeneratedData.type) || "マーク";
-  const rawChoices = choicesInput ? choicesInput.value.split(",").map(s => s.trim()).filter(s => s !== "") : [];
+  const rawChoices = choicesInput ? choicesInput.value.split(",").map(function (s) { return s.trim(); }).filter(function (s) { return s !== ""; }) : [];
   const correctAnswer = correctAnswerInput ? correctAnswerInput.value.trim() : "";
 
   if (copySuccessMessage) copySuccessMessage.classList.add("hidden");
@@ -829,118 +1025,83 @@ async function handleExportClick() {
   if (exportBtn) exportBtn.disabled = true;
   if (exportBtnText) exportBtnText.textContent = "問題画像を生成中...";
 
-  try {
-    if (typeof html2canvas !== "function") {
-      throw new Error("画像変換ライブラリ(html2canvas)がまだ読み込まれていません。数秒待つかページを再読み込みしてお試しください。");
-    }
-
-    const canvas = await html2canvas(problemCard, {
-      scale: 2,
-      backgroundColor: "#ffffff"
-    });
-    const problemImageBase64 = canvas.toDataURL("image/png");
-
-    let finalImageUrl = "";
-    let driveWarning = "";
-
-    // Googleドライブへの自動アップロード
-    if (!folderUrl) {
-      driveWarning = "⚠️ 「画像保存先 Googleドライブ フォルダURL」が未入力のため、問題画像をPCにダウンロード保存しました（URLを入力すると次回からドライブへ自動保存されます）。";
-    } else if (!folderUrl.includes("drive.google.com")) {
-      driveWarning = "⚠️ GoogleドライブのフォルダURL形式が正しくないため、問題画像をPCにダウンロード保存しました（https://drive.google.com/drive/folders/... のURLを指定してください）。";
-    } else {
-      if (exportBtnText) exportBtnText.textContent = "Googleドライブに保存中...";
-
-      try {
-        if (typeof google !== "undefined" && google.script && google.script.run) {
-          finalImageUrl = await new Promise((resolve, reject) => {
-            google.script.run
-              .withSuccessHandler(url => resolve(url))
-              .withFailureHandler(err => reject(err))
-              .uploadImageServer(folderUrl, problemImageBase64, `quiz_${Date.now()}.png`);
-          });
-        } else {
-          const uploadPayload = {
-            action: "uploadImage",
-            folderUrl: folderUrl,
-            base64Image: problemImageBase64,
-            filename: `quiz_${Date.now()}.png`
-          };
-
-          const uploadRes = await fetch(DEFAULT_GAS_URL, {
-            method: "POST",
-            headers: { "Content-Type": "text/plain;charset=utf-8" },
-            redirect: "follow",
-            body: JSON.stringify(uploadPayload)
-          });
-
-          if (uploadRes.ok) {
-            const resData = await uploadRes.json();
-            if (resData.imageUrl) {
-              finalImageUrl = resData.imageUrl;
-            } else if (resData.error) {
-              throw new Error(resData.error);
-            }
-          } else {
-            throw new Error("HTTP " + uploadRes.status);
-          }
-        }
-      } catch (e) {
-        console.warn("ドライブ保存エラー:", e);
-        driveWarning = "⚠️ Googleドライブ自動保存に失敗しました（" + (e && e.message ? e.message : e) + "）。代わりに画像をPCへダウンロード保存しました。";
+  ensureHtml2Canvas()
+    .then(function () {
+      return html2canvas(problemCard, {
+        scale: 2,
+        backgroundColor: "#ffffff"
+      });
+    })
+    .then(function (canvas) {
+      const problemImageBase64 = canvas.toDataURL("image/png");
+      if (folderUrl && folderUrl.includes("drive.google.com") && exportBtnText) {
+        exportBtnText.textContent = "Googleドライブに保存中...";
       }
-    }
+      return uploadProblemImage(folderUrl, problemImageBase64).then(function (res) {
+        return { problemImageBase64: problemImageBase64, uploadResult: res };
+      });
+    })
+    .then(function (bundle) {
+      let finalImageUrl = bundle.uploadResult.url;
+      const driveWarning = bundle.uploadResult.warning;
 
-    if (!finalImageUrl) {
-      finalImageUrl = "（Googleドライブ保存完了後にURLが入ります）";
-      downloadBase64Image(problemImageBase64, `${title}_問題.png`);
-    }
+      if (!finalImageUrl) {
+        finalImageUrl = "（Googleドライブ保存完了後にURLが入ります）";
+        downloadBase64Image(bundle.problemImageBase64, `${title}_問題.png`);
+      }
 
-    if (driveWarning && exportWarningMessage) {
-      exportWarningMessage.textContent = driveWarning;
-      exportWarningMessage.classList.remove("hidden");
-    }
+      if (driveWarning && exportWarningMessage) {
+        exportWarningMessage.textContent = driveWarning;
+        exportWarningMessage.classList.remove("hidden");
+      }
 
-    const choiceCols = [
-      rawChoices[0] || "",
-      rawChoices[1] || "",
-      rawChoices[2] || "",
-      rawChoices[3] || "",
-      rawChoices[4] || "",
-      rawChoices[5] || ""
-    ];
+      const choiceCols = [
+        rawChoices[0] || "",
+        rawChoices[1] || "",
+        rawChoices[2] || "",
+        rawChoices[3] || "",
+        rawChoices[4] || "",
+        rawChoices[5] || ""
+      ];
 
-    const tsvRow = [
-      title,
-      (type === "マーク" || type === "マーク式") ? "マーク" : "選択",
-      finalImageUrl,
-      choiceCols[0],
-      choiceCols[1],
-      choiceCols[2],
-      choiceCols[3],
-      choiceCols[4],
-      choiceCols[5],
-      correctAnswer,
-      "公開"
-    ].join("\t");
+      const sanitizeCell = function (val) {
+        return String(val || "").replace(/[\r\n\t]+/g, " ").trim();
+      };
 
-    if (manualCopyTextarea) manualCopyTextarea.value = tsvRow;
+      const tsvRow = [
+        sanitizeCell(title),
+        (type === "マーク" || type === "マーク式") ? "マーク" : "選択",
+        sanitizeCell(finalImageUrl),
+        sanitizeCell(choiceCols[0]),
+        sanitizeCell(choiceCols[1]),
+        sanitizeCell(choiceCols[2]),
+        sanitizeCell(choiceCols[3]),
+        sanitizeCell(choiceCols[4]),
+        sanitizeCell(choiceCols[5]),
+        sanitizeCell(correctAnswer),
+        "公開"
+      ].join("\t");
 
-    const copied = await copyTextSafely(tsvRow);
-    if (copied) {
-      if (copySuccessMessage) copySuccessMessage.classList.remove("hidden");
-      if (exportBtnText) exportBtnText.textContent = "✓ 保存＆クリップボードにコピー完了！";
-    } else {
-      if (manualCopyBox) manualCopyBox.classList.remove("hidden");
-      if (exportBtnText) exportBtnText.textContent = "Googleドライブ保存完了！（下のボタンでコピーしてください）";
-    }
-  } catch (err) {
-    console.error("エクスポートエラー:", err);
-    alert(`保存・コピー処理中にエラーが発生しました: ${err.message}`);
-    if (exportBtnText) exportBtnText.textContent = "Googleドライブに保存して、C列貼り付けデータをコピー！";
-  } finally {
-    if (exportBtn) exportBtn.disabled = false;
-  }
+      if (manualCopyTextarea) manualCopyTextarea.value = tsvRow;
+
+      return copyTextSafely(tsvRow).then(function (copied) {
+        if (copied) {
+          if (copySuccessMessage) copySuccessMessage.classList.remove("hidden");
+          if (exportBtnText) exportBtnText.textContent = "✓ 保存＆クリップボードにコピー完了！";
+        } else {
+          if (manualCopyBox) manualCopyBox.classList.remove("hidden");
+          if (exportBtnText) exportBtnText.textContent = "Googleドライブ保存完了！（下のボタンでコピーしてください）";
+        }
+      });
+    })
+    .catch(function (err) {
+      console.error("エクスポートエラー:", err);
+      alert(`保存・コピー処理中にエラーが発生しました: ${err.message}`);
+      if (exportBtnText) exportBtnText.textContent = "Googleドライブに保存して、C列貼り付けデータをコピー！";
+    })
+    .then(function () {
+      if (exportBtn) exportBtn.disabled = false;
+    });
 }
 
 function handleManualCopyClick() {
@@ -956,8 +1117,7 @@ function handleManualCopyClick() {
   } catch (e) {}
 
   if (!ok && navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(ta.value).catch(() => {});
-    ok = true;
+    navigator.clipboard.writeText(ta.value).catch(function () {});
   }
 
   if (copySuccessMessage) copySuccessMessage.classList.remove("hidden");

@@ -3,17 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <base target="_top">
   <title>数学小テスト 問題作成スタジオ (先生専用)</title>
-  <!-- 数式描画ライブラリ KaTeX CSS -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
   <link rel="stylesheet" href="creator.css">
 </head>
 <body>
   <div class="creator-container">
     <header class="creator-header">
       <div class="header-left">
-        <span class="badge" id="versionBadge">教員用ツール v3.0 (⏳ 起動中...)</span>
+        <span class="badge" id="versionBadge">教員用ツール v3.1 (⏳ 起動中...)</span>
         <h1>数学小テスト 問題作成スタジオ 🤖</h1>
         <p class="subtitle">問題画像を貼るだけで、改題・マーク枠化・解説作成・ドライブ保存・シート用コピーまで全自動！</p>
       </div>
@@ -31,14 +28,14 @@
         <div class="form-group">
           <label class="form-label">問題画像（Studyaidスクショや写真）</label>
           <div class="drop-zone" id="dropZone">
-            <input type="file" id="fileInput" accept="image/*" class="sr-only-file-input">
             <div class="drop-zone-content" id="dropZoneContent">
               <span class="drop-icon">📸</span>
               <p class="drop-text">ここに画像を<strong>ドラッグ＆ドロップ</strong>、または下のボタンから取り込み</p>
               <div class="upload-btn-group">
-                <label for="fileInput" id="fileSelectLabel" class="upload-action-btn file-select-btn">
-                  📁 ファイルを選択
-                </label>
+                <div class="upload-action-btn file-select-btn" id="fileSelectBtn">
+                  <span>📁 ファイルを選択</span>
+                  <input type="file" id="fileInput" accept="image/*" class="file-input-overlay" aria-label="画像ファイルを選択">
+                </div>
                 <button type="button" class="upload-action-btn clip-paste-btn" id="clipPasteBtn">
                   📋 スクショを貼り付け
                 </button>
@@ -49,7 +46,7 @@
                    role="textbox"
                    aria-label="画像貼り付け欄"
                    data-placeholder="💡 ここをクリックして Ctrl + V（または右クリック→貼り付け）"></div>
-              <p class="paste-status-msg hidden" id="pasteStatusMsg"></p>
+              <p class="paste-status-msg warn" id="pasteStatusMsg">⏳ 機能準備中...（このままお待ちください）</p>
             </div>
             <div class="image-preview-wrapper hidden" id="sourceImagePreviewWrapper">
               <img id="sourceImagePreview" src="" alt="元画像プレビュー">
@@ -219,9 +216,5 @@
   </div>
 
   <script src="creator.js"></script>
-  <!-- 数式描画・画像化ライブラリ（メインスクリプトをブロックしないよう末尾で読み込み） -->
-  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
 </body>
 </html>
