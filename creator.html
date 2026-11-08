@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>数学小テスト 問題作成スタジオ (先生専用)</title>
+  <!-- 数式描画ライブラリ KaTeX -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"></script>
+  <!-- 画像生成ライブラリ html2canvas -->
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <link rel="stylesheet" href="creator.css">
+</head>
+<body>
+  <div class="creator-container">
+    <header class="creator-header">
+      <div class="header-left">
+        <span class="badge">教員用ツール</span>
+        <h1>数学小テスト 問題作成スタジオ 🤖</h1>
+        <p class="subtitle">問題画像を貼るだけで、改題・マーク枠化・解説作成・ドライブ保存・シート用コピーまで全自動！</p>
+      </div>
+      <div class="header-right">
+        <a href="index.html" class="sub-link-btn" target="_blank">生徒用テスト画面を開く ↗</a>
+      </div>
+    </header>
+
+    <div class="creator-grid">
+      <!-- 左カラム: 入力・設定パネル -->
+      <section class="card input-panel">
+        <h2 class="card-title">1. 問題の入力とリクエスト</h2>
+
+        <!-- 画像ドロップ・ペーストエリア -->
+        <div class="form-group">
+          <label class="form-label">問題画像（Studyaidスクショや写真）</label>
+          <div class="drop-zone" id="dropZone">
+            <input type="file" id="fileInput" accept="image/*" class="file-input">
+            <div class="drop-zone-content" id="dropZoneContent">
+              <span class="drop-icon">📸</span>
+              <p class="drop-text"><strong>クリックして画像を選択</strong>、またはドラッグ＆ドロップ</p>
+              <p class="drop-subtext">💡 画面切り取り後、<strong>Ctrl + V</strong> で直接貼り付けも可能！</p>
+            </div>
+            <div class="image-preview-wrapper hidden" id="sourceImagePreviewWrapper">
+              <img id="sourceImagePreview" src="" alt="元画像プレビュー">
+              <button type="button" class="clear-img-btn" id="clearImgBtn">× 削除</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 改題リクエスト設定 -->
+        <div class="form-group">
+          <label class="form-label">改題モード</label>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input type="radio" name="remakeMode" value="exact" checked>
+              <span>そのまま使う（マーク化・選択化のみ）</span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="remakeMode" value="remake">
+              <span>改題する（数値替え・類題を作成）</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 出題形式 -->
+        <div class="form-group">
+          <label class="form-label">出題形式</label>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input type="radio" name="questionType" value="マーク" checked>
+              <span>マーク式（共通テスト風穴埋め [ア][イ]...）</span>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="questionType" value="選択">
+              <span>選択式（4択・2択など）</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 追加リクエスト（任意） -->
+        <div class="form-group">
+          <label class="form-label">追加の要望（任意）</label>
+          <input type="text" id="customPromptInput" class="text-input" placeholder="例: 「頂点を求める問題にして」「選択肢は4つにして」など">
+        </div>
+
+        <hr class="divider">
+
+        <!-- Google ドライブ保存先設定（自動記憶） -->
+        <div class="form-group">
+          <div class="label-with-badge">
+            <label class="form-label" for="driveFolderUrlInput">画像保存先 Googleドライブ フォルダURL</label>
+            <span class="saved-badge" id="folderSavedNotice">自動記憶済 ✓</span>
+          </div>
+          <input type="text" id="driveFolderUrlInput" class="text-input" placeholder="https://drive.google.com/drive/folders/XXXXX...">
+          <p class="field-hint">※一度入力すればブラウザが記憶します。いつでも書き換え可能です。</p>
+        </div>
+
+        <!-- Gemini APIキー設定（自動記憶） -->
+        <div class="form-group">
+          <div class="label-with-badge">
+            <label class="form-label" for="apiKeyInput">Gemini APIキー（無料）</label>
+            <span class="saved-badge" id="apiSavedNotice">自動記憶済 ✓</span>
+          </div>
+          <div class="password-wrapper">
+            <input type="password" id="apiKeyInput" class="text-input" placeholder="AI Studioで発行したAPIキーを貼り付け">
+            <button type="button" id="toggleApiVisibilityBtn" class="toggle-vis-btn">👁️</button>
+          </div>
+          <p class="field-hint">
+            <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Google AI Studio</a> から1分で無料取得できます。PC内部にのみ安全に保存されます。
+          </p>
+        </div>
+
+        <!-- 生成ボタン -->
+        <button type="button" class="generate-btn" id="generateBtn" disabled>
+          <span class="btn-icon">⚡️</span>
+          <span>問題と解説をAI生成する</span>
+        </button>
+      </section>
+
+      <!-- 右カラム: プレビュー＆確定コピーパネル -->
+      <section class="card output-panel">
+        <h2 class="card-title">2. 生成結果の確認 ＆ ドライブ保存・コピー</h2>
+
+        <!-- 未生成時の案内表示 -->
+        <div class="placeholder-box" id="placeholderBox">
+          <span class="placeholder-icon">📐</span>
+          <h3>左側で問題画像を選んで「AI生成」を押してください</h3>
+          <p>数秒で、マーク枠つき問題画像、詳細な解説画像、正解、スプレッドシート用データがここに表示されます。</p>
+        </div>
+
+        <!-- 生成中のスピナー -->
+        <div class="loading-box hidden" id="loadingBox">
+          <div class="spinner"></div>
+          <p class="loading-status" id="loadingStatusText">AIが画像を解析・改題中...</p>
+        </div>
+
+        <!-- 生成結果のプレビューエリア -->
+        <div class="result-area hidden" id="resultArea">
+          <!-- タイトル編集 -->
+          <div class="form-group">
+            <label class="form-label">問題タイトル案（修正可能）</label>
+            <input type="text" id="resultTitleInput" class="text-input font-bold">
+          </div>
+
+          <!-- 生成された問題カード（画像化対象） -->
+          <div class="form-group">
+            <div class="label-row">
+              <label class="form-label">生成された問題プレビュー</label>
+              <span class="preview-badge">画像として保存されます</span>
+            </div>
+            <div class="math-card" id="problemCard">
+              <div class="math-card-badge" id="problemCardBadge">問題</div>
+              <div class="math-card-content" id="problemCardContent">
+                <!-- KaTeXで数式レンダリング -->
+              </div>
+            </div>
+          </div>
+
+          <!-- 枠・選択肢・正解の確認 -->
+          <div class="form-row-2">
+            <div class="form-group">
+              <label class="form-label" id="choicesLabel">選択肢 / 枠ラベル</label>
+              <input type="text" id="choicesInput" class="text-input" placeholder="例: ア, イ または A, B, C, D">
+              <p class="field-hint">※カンマ区切りで入力</p>
+            </div>
+            <div class="form-group">
+              <label class="form-label">正解</label>
+              <input type="text" id="correctAnswerInput" class="text-input font-bold" placeholder="例: 1, 2">
+            </div>
+          </div>
+
+          <!-- 生成された解説カード（画像化対象） -->
+          <div class="form-group">
+            <div class="label-row">
+              <label class="form-label">生成された解説プレビュー</label>
+              <span class="preview-badge secondary">復習・配布用</span>
+            </div>
+            <div class="math-card explanation-card" id="explanationCard">
+              <div class="math-card-badge explanation-badge">解説・解答のポイント</div>
+              <div class="math-card-content" id="explanationCardContent">
+                <!-- KaTeXで解説レンダリング -->
+              </div>
+            </div>
+          </div>
+
+          <div class="action-footer">
+            <button type="button" class="export-btn" id="exportBtn">
+              <span class="btn-icon">📋</span>
+              <span id="exportBtnText">Googleドライブに保存して、C列貼り付けデータをコピー！</span>
+            </button>
+            <div class="copy-success-message hidden" id="copySuccessMessage">
+              🎉 <strong>コピー完了！</strong> スプレッドシートの <strong>C列（例: C3セル）</strong> を選択して <strong>Ctrl + V</strong> を押してください！
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <script src="creator.js"></script>
+</body>
+</html>

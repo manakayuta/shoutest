@@ -1,9 +1,10 @@
 /**
  * ========================================================
- * 数学小テストシステム マーク式＋選択式ハイブリッド版 (コード.gs)
+ * 数学小テストシステム マーク式＋選択式＋画像アップロード対応版 (コード.gs)
  * ========================================================
  */
 
+// 1. 生徒用Webアプリ画面の配信
 function doGet(e) {
   return HtmlService.createHtmlOutputFromFile("index")
     .setTitle("数学小テストシステム")
@@ -51,7 +52,7 @@ function getQuestionListServer() {
     });
 }
 
-// 3. 個別問題データの取得（マーク式ラベル・最大6択対応）
+// 3. 個別問題データの取得
 function getQuestionServer(questionId) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName("問題一覧");
@@ -71,7 +72,6 @@ function getQuestionServer(questionId) {
   const rawImageUrl = String(targetRow[4] || "");
   const directImageUrl = convertDriveUrlToDirect(rawImageUrl);
 
-  // F列(5)〜K列(10)の最大6項目
   const choices = [
     String(targetRow[5] || ""),
     String(targetRow[6] || ""),
@@ -91,7 +91,7 @@ function getQuestionServer(questionId) {
   };
 }
 
-// 4. 解答送信と記録（★マーク式の表記ゆれ吸収対応）
+// 4. 解答送信と記録
 function submitAnswerServer(questionId, selectedChoice) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const qSheet = ss.getSheetByName("問題一覧");
@@ -106,11 +106,8 @@ function submitAnswerServer(questionId, selectedChoice) {
   const correctAnswer = String(targetQ[11]).trim();
   const studentAnswer = String(selectedChoice).trim();
 
-  // 正誤判定:
-  // 1. 通常の完全一致
   let isCorrect = (studentAnswer.toUpperCase() === correctAnswer.toUpperCase());
 
-  // 2. マーク式用の正規化（カンマ、空白、ハイフン、全角記号、π/pi、e/E を統一して比較）
   if (!isCorrect) {
     const normalize = (str) => String(str)
       .replace(/[\s,、\-_ー−]/g, "")
@@ -139,7 +136,7 @@ function submitAnswerServer(questionId, selectedChoice) {
     studentEmail,
     questionId,
     title,
-    "'" + studentAnswer, // 先頭にシングルクォートを付与してスプレッドシートの日付自動変換を防止
+    "'" + studentAnswer, // 先頭にシングルクォートを付与して日付化防止
     resultText
   ]);
 
@@ -158,4 +155,43 @@ function convertDriveUrlToDirect(url) {
     return "https://lh3.googleusercontent.com/d/" + match[1];
   }
   return url;
+}
+
+// 5. 問題作成スタジオからのGoogleドライブ自動画像保存 (POST)
+function doPost(e) {
+  try {
+    const postData = JSON.parse(e.postData.contents);
+    if (postData.action === "uploadImage") {
+      const folderUrl = String(postData.folderUrl || "");
+      const folderMatch = folderUrl.match(/\/folders\/([a-zA-Z0-9_-]+)/);
+      if (!folderMatch || !folderMatch[1]) {
+        throw new Error("有効なGoogleドライブフォルダURLではありません（フォルダURL形式を確認してください）");
+      }
+
+      const folderId = folderMatch[1];
+      const folder = DriveApp.getFolderById(folderId);
+
+      const base64Str = postData.base64Image.replace(/^data:image\/\w+;base64,/, "");
+      const decodedBytes = Utilities.base64Decode(base64Str);
+      const filename = postData.filename || `quiz_${Date.now()}.png`;
+      const blob = Utilities.newBlob(decodedBytes, "image/png", filename);
+
+      const file = folder.createFile(blob);
+      try {
+        file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+      } catch (err) {
+        file.setSharing(DriveApp.Access.DOMAIN_WITH_LINK, DriveApp.Permission.VIEW);
+      }
+
+      const directUrl = "https://lh3.googleusercontent.com/d/" + file.getId();
+      return ContentService.createTextOutput(JSON.stringify({ imageUrl: directUrl, fileId: file.getId() }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+
+    return ContentService.createTextOutput(JSON.stringify({ error: "不明なアクション" }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ error: err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
 }
