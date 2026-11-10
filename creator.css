@@ -622,14 +622,36 @@ body {
   background: #ffffff;
   border: 2px solid #334155;
   border-radius: 10px;
-  padding: 24px;
+  padding: 24px 28px;
   position: relative;
   font-family: var(--math-font);
-  font-size: 1.15rem;
-  line-height: 1.7;
+  font-size: 1.18rem;
+  line-height: 1.85;
   color: #0f172a;
-  min-height: 120px;
+  min-height: 100px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.math-card-content {
+  text-align: left;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
+.math-card-content .katex-display {
+  display: inline !important;
+  margin: 0 0.25em !important;
+  text-align: inherit !important;
+}
+
+.math-card-content .katex-display > .katex {
+  display: inline !important;
+  text-align: inherit !important;
+}
+
+.math-card-content .katex {
+  font-size: 1.05em;
+  white-space: nowrap;
 }
 
 .math-card-badge {

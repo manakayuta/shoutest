@@ -211,12 +211,12 @@ function generateQuizServer(apiKey, requestBody, preferredModel) {
 
   // フォールバック候補（廃止済みの旧モデル名 gemini-1.5-flash は除外）
   const staticList = [
-    "gemini-2.5-flash",
     "gemini-3.8-flash",
-    "gemini-2.5-pro",
+    "gemini-3.5-flash-lite",
+    "gemini-2.5-flash",
     "gemini-2.0-flash",
-    "gemini-1.5-flash-latest",
-    "gemini-1.5-pro"
+    "gemini-3.8-pro",
+    "gemini-2.5-pro"
   ];
   for (let s = 0; s < staticList.length; s++) {
     if (candidates.indexOf(staticList[s]) === -1) {
@@ -253,7 +253,8 @@ function generateQuizServer(apiKey, requestBody, preferredModel) {
       } catch (e) {}
 
       attempted.push(model + " => " + apiErrMsg);
-      if (code === 400 || code === 401 || code === 403 || code === 429) {
+      // 400(不正リクエスト), 401(キー無効), 403(権限なし)のみ中断。429(クォータ制限)は次のモデル候補へ
+      if (code === 400 || code === 401 || code === 403) {
         throw new Error("Gemini API エラー (" + apiErrMsg + ")");
       }
     } catch (fetchErr) {
@@ -287,13 +288,35 @@ function listModelsServer(apiKey) {
             }
           }
         });
-        list.sort(function (a, b) {
-          const aFlash = a.indexOf("flash") !== -1 ? 1 : 0;
-          const bFlash = b.indexOf("flash") !== -1 ? 1 : 0;
-          if (aFlash !== bFlash) return bFlash - aFlash;
+        const excluded = ["omni", "embedding", "aqa", "realtime", "live", "image", "tts"];
+        const filtered = list.filter(function (name) {
+          const lower = name.toLowerCase();
+          for (let i = 0; i < excluded.length; i++) {
+            if (lower.indexOf(excluded[i]) !== -1) return false;
+          }
+          return true;
+        });
+
+        const getScore = function (name) {
+          if (name.indexOf("gemini-3.8-flash") === 0) return 120;
+          if (name.indexOf("gemini-3.5-flash") === 0) return 110;
+          if (name.indexOf("gemini-3-flash") === 0) return 105;
+          if (name.indexOf("gemini-2.5-flash") === 0) return 100;
+          if (name.indexOf("gemini-2.0-flash") === 0) return 90;
+          if (name.indexOf("flash") !== -1) return 80;
+          if (name.indexOf("gemini-3.8-pro") === 0) return 70;
+          if (name.indexOf("gemini-3.5-pro") === 0) return 60;
+          if (name.indexOf("gemini-2.5-pro") === 0) return 50;
+          if (name.indexOf("pro") !== -1) return 40;
+          return 10;
+        };
+
+        filtered.sort(function (a, b) {
+          const scoreDiff = getScore(b) - getScore(a);
+          if (scoreDiff !== 0) return scoreDiff;
           return b.localeCompare(a);
         });
-        return list;
+        return filtered;
       }
     }
   } catch (e) {}

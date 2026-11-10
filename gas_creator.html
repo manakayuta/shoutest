@@ -629,14 +629,36 @@ body {
   background: #ffffff;
   border: 2px solid #334155;
   border-radius: 10px;
-  padding: 24px;
+  padding: 24px 28px;
   position: relative;
   font-family: var(--math-font);
-  font-size: 1.15rem;
-  line-height: 1.7;
+  font-size: 1.18rem;
+  line-height: 1.85;
   color: #0f172a;
-  min-height: 120px;
+  min-height: 100px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.math-card-content {
+  text-align: left;
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
+.math-card-content .katex-display {
+  display: inline !important;
+  margin: 0 0.25em !important;
+  text-align: inherit !important;
+}
+
+.math-card-content .katex-display > .katex {
+  display: inline !important;
+  text-align: inherit !important;
+}
+
+.math-card-content .katex {
+  font-size: 1.05em;
+  white-space: nowrap;
 }
 
 .math-card-badge {
@@ -792,7 +814,7 @@ body {
   <div class="creator-container">
     <header class="creator-header">
       <div class="header-left">
-        <span class="badge" id="versionBadge">教員用ツール v3.5 (⏳ 起動中...)</span>
+        <span class="badge" id="versionBadge">教員用ツール v4.0 (⏳ 起動中...)</span>
         <h1>数学小テスト 問題作成スタジオ 🤖</h1>
         <p class="subtitle">問題画像を貼るだけで、改題・マーク枠化・解説作成・ドライブ保存・シート用コピーまで全自動！</p>
       </div>
@@ -1004,7 +1026,7 @@ body {
 
   <script>
 // ========================================================
-// 数学小テスト 問題作成スタジオ ロジック v3.5 (creator.js)
+// 数学小テスト 問題作成スタジオ ロジック v4.0 (creator.js)
 // GAS (HtmlService iframe) / ローカル両対応・完全版
 // 生徒用画面 (index.html) と同一の純粋ES構文・AIモデル動的自動検出＆タイムアウト無制限版
 // ========================================================
@@ -1101,7 +1123,7 @@ function resetPasteBoxState() {
     box.classList.remove("paste-ready");
     box.setAttribute("data-placeholder", "💡 ここをクリックして Ctrl + V（または右クリック→貼り付け）");
   }
-  setPasteStatus("🟢 動作準備OK (v3.5) — ファイル選択 / D&D / Ctrl+V すべて対応", "ready");
+  setPasteStatus("🟢 動作準備OK (v4.0) — ファイル選択 / D&D / Ctrl+V すべて対応", "ready");
 }
 
 // ==========================================
@@ -1384,8 +1406,8 @@ function initCreatorApp() {
       manualCopyBtn.addEventListener("click", handleManualCopyClick);
     }
 
-    setVersionBadge("教員用ツール v3.5 (🟢 動作準備OK)", "badge-ready");
-    setPasteStatus("🟢 動作準備OK (v3.5) — ファイル選択 / D&D / Ctrl+V すべて対応", "ready");
+    setVersionBadge("教員用ツール v4.0 (🟢 動作準備OK)", "badge-ready");
+    setPasteStatus("🟢 動作準備OK (v4.0) — ファイル選択 / D&D / Ctrl+V すべて対応", "ready");
 
     // ブラウザの遅延自動入力（オートフィル）対策
     [300, 1000, 2500].forEach(function (delay) {
@@ -1397,7 +1419,7 @@ function initCreatorApp() {
   } catch (err) {
     const msg = err && err.message ? err.message : String(err);
     console.error("Creator init error:", err);
-    setVersionBadge("教員用ツール v3.5 (🔴 起動エラー: " + msg + ")", "badge-error");
+    setVersionBadge("教員用ツール v4.0 (🔴 起動エラー: " + msg + ")", "badge-error");
     setPasteStatus("🔴 起動エラー: " + msg, "error");
   }
 }
@@ -1405,7 +1427,7 @@ function initCreatorApp() {
 window.addEventListener("error", function (e) {
   if (!isAppInitialized) {
     const msg = (e && e.message) ? e.message : "不明なエラー";
-    setVersionBadge("教員用ツール v3.5 (🔴 エラー: " + msg + ")", "badge-error");
+    setVersionBadge("教員用ツール v4.0 (🔴 エラー: " + msg + ")", "badge-error");
     setPasteStatus("🔴 エラー: " + msg, "error");
   }
 });
@@ -1867,13 +1889,35 @@ function extractGenerateModels(data) {
       }
     }
   });
-  list.sort(function (a, b) {
-    const aFlash = a.indexOf("flash") !== -1 ? 1 : 0;
-    const bFlash = b.indexOf("flash") !== -1 ? 1 : 0;
-    if (aFlash !== bFlash) return bFlash - aFlash;
+  const excluded = ["omni", "embedding", "aqa", "realtime", "live", "image", "tts"];
+  const filtered = list.filter(function (name) {
+    const lower = name.toLowerCase();
+    for (let i = 0; i < excluded.length; i++) {
+      if (lower.indexOf(excluded[i]) !== -1) return false;
+    }
+    return true;
+  });
+
+  const getScore = function (name) {
+    if (name.indexOf("gemini-3.8-flash") === 0) return 120;
+    if (name.indexOf("gemini-3.5-flash") === 0) return 110;
+    if (name.indexOf("gemini-3-flash") === 0) return 105;
+    if (name.indexOf("gemini-2.5-flash") === 0) return 100;
+    if (name.indexOf("gemini-2.0-flash") === 0) return 90;
+    if (name.indexOf("flash") !== -1) return 80;
+    if (name.indexOf("gemini-3.8-pro") === 0) return 70;
+    if (name.indexOf("gemini-3.5-pro") === 0) return 60;
+    if (name.indexOf("gemini-2.5-pro") === 0) return 50;
+    if (name.indexOf("pro") !== -1) return 40;
+    return 10;
+  };
+
+  filtered.sort(function (a, b) {
+    const scoreDiff = getScore(b) - getScore(a);
+    if (scoreDiff !== 0) return scoreDiff;
     return b.localeCompare(a);
   });
-  return list;
+  return filtered;
 }
 
 function fetchAvailableModels(apiKey) {
@@ -1972,7 +2016,8 @@ function callGeminiWithFallback(modelCandidates, idx, apiKey, requestBody, lastE
     return res.json().catch(function () { return {}; }).then(function (errJson) {
       const apiMsg = (errJson && errJson.error && errJson.error.message) ? errJson.error.message : (res.statusText || "Error");
       const statusMsg = "HTTP " + res.status + ": " + apiMsg;
-      if (res.status === 400 || res.status === 401 || res.status === 403 || res.status === 429) {
+      // 400(不正リクエスト), 401(キー無効), 403(権限なし)のみ即時中断。429(クォータ制限)は次のモデルを試す
+      if (res.status === 400 || res.status === 401 || res.status === 403) {
         const fatal = new Error("Gemini API エラー (" + statusMsg + ")");
         fatal.httpStatus = res.status;
         fatal.isFatalApiError = true;
@@ -2076,16 +2121,20 @@ function handleGenerateClick() {
           "- 出題形式: " + questionType + "（マーク式または選択式）",
           customPrompt ? ("- 追加指示: " + customPrompt) : "",
           "",
-          "【数学・表記ルール】",
-          "1. 数式はすべて LaTeX 記法（$ ... $ または $ ... $）で美しく記述してください。",
-          "2. マーク式の場合:",
-          "   - 問題文中に穴埋め枠として \\fbox{ ア } や \\fbox{ イ } のようにマーク枠を配置してください。",
+          "【重要：横長レイアウト＆数式のインライン配置ルール（超縦長化防止）】",
+          "1. 小テスト画面で美しく収まるよう、教科書や共通テストと同じ「横長（幅広でコンパクト）な問題用紙風」に作成してください。",
+          "2. 文中のアルファベット（x, y, A, B, C 等）や数式、座標、マーク枠（\\fbox{ ア }）は、絶対に独立行（$ ... $）にせず、必ず【インライン数式 $ ... $】を使って自然な日本語文の中にそのまま埋め込んでください。",
+          "   - 【良い例】: 2つの放物線 $y = x^2, y = \\frac{1}{4}x^2$ と、点 $A(3, 0)$ を考える。点 $A$ を通り $y$ 軸に平行な直線と放物線 $y = x^2$ との交点を $B$ とし、点 $C$ の座標は $(\\fbox{ ア }, \\fbox{ イ })$ である。",
+          "   - 【悪い例（厳禁）】: 「点\\n$A$\\nを通り\\n$y$\\n軸...」のように単語ごとに改行したり、一文字ごとに $ で中央揃えにすることは絶対に禁止です。",
+          "3. 文章は句点（。）まで1行として自然に流れるようにし、単語やフレーズの途中での不自然な改行（\\n）は一切入れないでください。問題文全体として2〜4行程度の横長の美しい文章にまとめてください。",
+          "4. マーク式の場合:",
+          "   - マーク枠は文中にインラインで \\fbox{ ア } や \\fbox{ イ } のように配置してください。",
           "   - slotsOrChoices には [\"ア\", \"イ\"] のように使用したマーク枠のカタカナ文字を配列で入れてください。",
-          "   - correctAnswer には \"1, 2\" や \"-, 3\" のようにカンマ区切りで各枠の正解を入れてください。",
-          "3. 選択式の場合:",
+          "   - correctAnswer には \"1, 2\" や \"6, 9\" のようにカンマ区切りで各枠の正解を入れてください。",
+          "5. 選択式の場合:",
           "   - slotsOrChoices には [\"選択肢Aのテキスト\", \"選択肢Bのテキスト\", \"選択肢Cのテキスト\", \"選択肢Dのテキスト\"] を入れてください（2〜4択）。",
           "   - correctAnswer には正解の文字（\"A\", \"B\", \"C\", \"D\" のいずれか）を入れてください。",
-          "4. explanationMarkdown には、生徒が読んですぐ理解できる丁寧な途中式とポイント解説を LaTeX を交えて記述してください。",
+          "6. explanationMarkdown には、生徒が読んですぐ理解できる丁寧な途中式とポイント解説を LaTeX を交えて記述してください。",
           "",
           "【出力フォーマット】",
           "以下のJSONフォーマットのみを純粋に出力してください（コードブロック記号は含めないでください）。",
@@ -2096,7 +2145,7 @@ function handleGenerateClick() {
           "  \"slotsOrChoices\": [\"ア\", \"イ\"],",
           "  \"correctAnswer\": \"1, 2\",",
           "  \"explanationMarkdown\": \"解説本文（LaTeX数式記法を含む）\"",
-          "}"
+          "}",
         ].join("\n");
 
         const requestBody = {
@@ -2256,11 +2305,51 @@ function renderPreview(data) {
 
 function formatMarkdownMath(text) {
   if (!text) return "";
+  let s = String(text);
+
+  // 1. \[ ... \] を $ ... $ に変換（Geminiが多用するディスプレイ数式をインライン化）
+  s = s.replace(/\\\[([\s\S]*?)\\\]/g, function (match, inner) {
+    return " $" + inner.trim() + "$ ";
+  });
+
+  // 2. $ ... $ を $ ... $ に変換（インライン化）
+  s = s.replace(/\$\$([\s\S]*?)\$\$/g, function (match, inner) {
+    return " $" + inner.trim() + "$ ";
+  });
+
+  // 3. \( ... \) を $ ... $ に統一
+  s = s.replace(/\\\(([\s\S]*?)\\\)/g, function (match, inner) {
+    return " $" + inner.trim() + "$ ";
+  });
+
+  // 4. 文中の単独改行を結合（句点やコロン、箇条書き記号以外での改行を自然に横長に接続）
+  const lines = s.split(/\r?\n/);
+  const merged = [];
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) {
+      merged.push("");
+      continue;
+    }
+    const isBulletOrHeading = /^([-*・]|\d+\.|\#+)/.test(line);
+
+    if (merged.length > 0 && merged[merged.length - 1] !== "" && !isBulletOrHeading) {
+      const prev = merged[merged.length - 1];
+      if (!/[。．!！?？:：]$/.test(prev)) {
+        merged[merged.length - 1] = prev + " " + line;
+        continue;
+      }
+    }
+    merged.push(line);
+  }
+
   const br = "<" + "br>";
   const stOpen = "<" + "strong>";
   const stClose = "<" + "/strong>";
-  return String(text)
-    .replace(/\n\n/g, br + br)
+
+  return merged.join("\n")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n\n+/g, br + br)
     .replace(/\n/g, br)
     .replace(/\*\*(.*?)\*\*/g, stOpen + "$1" + stClose);
 }
@@ -2269,9 +2358,9 @@ function renderMath(element) {
   if (typeof renderMathInElement === "function") {
     renderMathInElement(element, {
       delimiters: [
-        { left: "$", right: "$", display: true },
         { left: "$", right: "$", display: false },
-        { left: "\\[", right: "\\]", display: true },
+        { left: "$", right: "$", display: false },
+        { left: "\\[", right: "\\]", display: false },
         { left: "\\(", right: "\\)", display: false }
       ],
       throwOnError: false
@@ -2312,19 +2401,21 @@ function execCommandCopyFallback(text) {
   }
 }
 
-function uploadProblemImage(folderUrl, problemImageBase64) {
+function uploadImageToDrive(folderUrl, imageBase64, filename) {
   if (!folderUrl) {
     return Promise.resolve({
       url: "",
-      warning: "⚠️ 「画像保存先 Googleドライブ フォルダURL」が未入力のため、問題画像をPCにダウンロード保存しました（URLを入力すると次回からドライブへ自動保存されます）。"
+      warning: "⚠️ 「画像保存先 Googleドライブ フォルダURL」が未入力のため、画像をPCにダウンロード保存しました（URLを入力すると次回からドライブへ自動保存されます）。"
     });
   }
   if (!folderUrl.includes("drive.google.com")) {
     return Promise.resolve({
       url: "",
-      warning: "⚠️ GoogleドライブのフォルダURL形式が正しくないため、問題画像をPCにダウンロード保存しました（https://drive.google.com/drive/folders/... のURLを指定してください）。"
+      warning: "⚠️ GoogleドライブのフォルダURL形式が正しくないため、画像をPCにダウンロード保存しました（https://drive.google.com/drive/folders/... のURLを指定してください）。"
     });
   }
+
+  const safeFilename = filename || ("quiz_" + Date.now() + ".png");
 
   if (typeof google !== "undefined" && google.script && google.script.run) {
     return new Promise(function (resolve) {
@@ -2339,15 +2430,15 @@ function uploadProblemImage(folderUrl, problemImageBase64) {
             warning: "⚠️ Googleドライブ自動保存に失敗しました（" + errMsg + "）。代わりに画像をPCへダウンロード保存しました。"
           });
         })
-        .uploadImageServer(folderUrl, problemImageBase64, "quiz_" + Date.now() + ".png");
+        .uploadImageServer(folderUrl, imageBase64, safeFilename);
     });
   }
 
   const uploadPayload = {
     action: "uploadImage",
     folderUrl: folderUrl,
-    base64Image: problemImageBase64,
-    filename: "quiz_" + Date.now() + ".png"
+    base64Image: imageBase64,
+    filename: safeFilename
   };
 
   return fetch(DEFAULT_GAS_URL, {
@@ -2380,6 +2471,7 @@ function handleExportClick() {
   const choicesInput = el("choicesInput");
   const correctAnswerInput = el("correctAnswerInput");
   const problemCard = el("problemCard");
+  const explanationCard = el("explanationCard");
   const copySuccessMessage = el("copySuccessMessage");
   const exportWarningMessage = el("exportWarningMessage");
   const manualCopyBox = el("manualCopyBox");
@@ -2389,6 +2481,10 @@ function handleExportClick() {
 
   const folderUrl = driveFolderUrlInput ? driveFolderUrlInput.value.trim() : "";
   const title = (resultTitleInput && resultTitleInput.value.trim()) || "小テスト";
+  const safeTitle = title.replace(/[\\/:*?"<>|]/g, "_");
+  const problemFilename = safeTitle + ".png";
+  const explanationFilename = "【解説】" + safeTitle + ".png";
+
   const type = (currentGeneratedData && currentGeneratedData.type) || "マーク";
   const rawChoices = choicesInput ? choicesInput.value.split(",").map(function (s) { return s.trim(); }).filter(function (s) { return s !== ""; }) : [];
   const correctAnswer = correctAnswerInput ? correctAnswerInput.value.trim() : "";
@@ -2400,31 +2496,56 @@ function handleExportClick() {
   }
   if (manualCopyBox) manualCopyBox.classList.add("hidden");
   if (exportBtn) exportBtn.disabled = true;
-  if (exportBtnText) exportBtnText.textContent = "問題画像を生成中...";
+  if (exportBtnText) exportBtnText.textContent = "問題と解説の画像を生成中...";
 
   ensureHtml2Canvas()
     .then(function () {
+      // 1. 問題カードを画像化
       return html2canvas(problemCard, {
         scale: 2,
         backgroundColor: "#ffffff"
       });
     })
-    .then(function (canvas) {
-      const problemImageBase64 = canvas.toDataURL("image/png");
+    .then(function (problemCanvas) {
+      const problemImageBase64 = problemCanvas.toDataURL("image/png");
+
+      // 2. 解説カードを画像化
+      return html2canvas(explanationCard, {
+        scale: 2,
+        backgroundColor: "#ffffff"
+      }).then(function (explanationCanvas) {
+        const explanationImageBase64 = explanationCanvas.toDataURL("image/png");
+        return {
+          problemBase64: problemImageBase64,
+          explanationBase64: explanationImageBase64
+        };
+      });
+    })
+    .then(function (images) {
       if (folderUrl && folderUrl.includes("drive.google.com") && exportBtnText) {
-        exportBtnText.textContent = "Googleドライブに保存中...";
+        exportBtnText.textContent = "Googleドライブに保存中（問題＆解説）...";
       }
-      return uploadProblemImage(folderUrl, problemImageBase64).then(function (res) {
-        return { problemImageBase64: problemImageBase64, uploadResult: res };
+
+      // 問題画像と解説画像を並列でGoogleドライブに保存
+      const p1 = uploadImageToDrive(folderUrl, images.problemBase64, problemFilename);
+      const p2 = uploadImageToDrive(folderUrl, images.explanationBase64, explanationFilename);
+
+      return Promise.all([p1, p2]).then(function (results) {
+        return {
+          images: images,
+          problemRes: results[0],
+          explanationRes: results[1]
+        };
       });
     })
     .then(function (bundle) {
-      let finalImageUrl = bundle.uploadResult.url;
-      const driveWarning = bundle.uploadResult.warning;
+      let finalImageUrl = bundle.problemRes.url;
+      const driveWarning = bundle.problemRes.warning || bundle.explanationRes.warning;
 
       if (!finalImageUrl) {
         finalImageUrl = "（Googleドライブ保存完了後にURLが入ります）";
-        downloadBase64Image(bundle.problemImageBase64, title + "_問題.png");
+        downloadBase64Image(bundle.images.problemBase64, problemFilename);
+        downloadBase64Image(bundle.images.explanationBase64, explanationFilename);
       }
 
       if (driveWarning && exportWarningMessage) {
@@ -2432,6 +2553,7 @@ function handleExportClick() {
         exportWarningMessage.classList.remove("hidden");
       }
 
+      // スプレッドシート用 C〜M列（11列）TSV行の構築
       const choiceCols = [
         rawChoices[0] || "",
         rawChoices[1] || "",
@@ -2463,21 +2585,27 @@ function handleExportClick() {
 
       return copyTextSafely(tsvRow).then(function (copied) {
         if (copied) {
-          if (copySuccessMessage) copySuccessMessage.classList.remove("hidden");
+          if (copySuccessMessage) {
+            copySuccessMessage.textContent = "✓ 問題＆解説画像をドライブに保存し、C列貼り付けデータをコピーしました！";
+            copySuccessMessage.classList.remove("hidden");
+          }
           if (exportBtnText) exportBtnText.textContent = "✓ 保存＆クリップボードにコピー完了！";
         } else {
           if (manualCopyBox) manualCopyBox.classList.remove("hidden");
-          if (exportBtnText) exportBtnText.textContent = "Googleドライブ保存完了！（下のボタンでコピーしてください）";
+          if (exportBtnText) exportBtnText.textContent = "ドライブ保存完了！（下のボタンでコピーしてください）";
         }
       });
     })
     .catch(function (err) {
-      console.error("エクスポートエラー:", err);
-      const errMsg = (err && err.message) ? err.message : String(err);
-      alert("保存・コピー処理中にエラーが発生しました: " + errMsg);
+      console.error("Export error:", err);
+      const msg = (err && err.message) ? err.message : String(err);
+      if (exportWarningMessage) {
+        exportWarningMessage.textContent = "保存・コピー処理でエラーが発生しました: " + msg;
+        exportWarningMessage.classList.remove("hidden");
+      }
       if (exportBtnText) exportBtnText.textContent = "Googleドライブに保存して、C列貼り付けデータをコピー！";
     })
-    .then(function () {
+    .finally(function () {
       if (exportBtn) exportBtn.disabled = false;
     });
 }
