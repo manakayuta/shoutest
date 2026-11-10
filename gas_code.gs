@@ -116,6 +116,7 @@ function submitAnswerServer(questionId, selectedChoice) {
 
   if (!isCorrect) {
     const normalize = (str) => String(str)
+      .replace(/^['’]/, "")
       .replace(/[\s,、\-_ー−]/g, "")
       .replace(/パイ/g, "PI")
       .toUpperCase()

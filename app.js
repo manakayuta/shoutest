@@ -181,6 +181,7 @@ async function submitAnswer(answerText) {
   if (!GAS_WEB_APP_URL || GAS_WEB_APP_URL.trim() === "") {
     await new Promise((resolve) => setTimeout(resolve, 600));
     const normalize = (str) => String(str)
+      .replace(/^['’]/, "")
       .replace(/[\s,、\-_ー−]/g, "")
       .replace(/パイ/g, "PI")
       .toUpperCase()

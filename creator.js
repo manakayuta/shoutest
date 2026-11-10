@@ -1,5 +1,5 @@
 // ========================================================
-// 数学小テスト 問題作成スタジオ ロジック v4.0 (creator.js)
+// 数学小テスト 問題作成スタジオ ロジック v4.1 (creator.js)
 // GAS (HtmlService iframe) / ローカル両対応・完全版
 // 生徒用画面 (index.html) と同一の純粋ES構文・AIモデル動的自動検出＆タイムアウト無制限版
 // ========================================================
@@ -96,7 +96,7 @@ function resetPasteBoxState() {
     box.classList.remove("paste-ready");
     box.setAttribute("data-placeholder", "💡 ここをクリックして Ctrl + V（または右クリック→貼り付け）");
   }
-  setPasteStatus("🟢 動作準備OK (v4.0) — ファイル選択 / D&D / Ctrl+V すべて対応", "ready");
+  setPasteStatus("🟢 動作準備OK (v4.1) — ファイル選択 / D&D / Ctrl+V すべて対応", "ready");
 }
 
 // ==========================================
@@ -379,8 +379,8 @@ function initCreatorApp() {
       manualCopyBtn.addEventListener("click", handleManualCopyClick);
     }
 
-    setVersionBadge("教員用ツール v4.0 (🟢 動作準備OK)", "badge-ready");
-    setPasteStatus("🟢 動作準備OK (v4.0) — ファイル選択 / D&D / Ctrl+V すべて対応", "ready");
+    setVersionBadge("教員用ツール v4.1 (🟢 動作準備OK)", "badge-ready");
+    setPasteStatus("🟢 動作準備OK (v4.1) — ファイル選択 / D&D / Ctrl+V すべて対応", "ready");
 
     // ブラウザの遅延自動入力（オートフィル）対策
     [300, 1000, 2500].forEach(function (delay) {
@@ -392,7 +392,7 @@ function initCreatorApp() {
   } catch (err) {
     const msg = err && err.message ? err.message : String(err);
     console.error("Creator init error:", err);
-    setVersionBadge("教員用ツール v4.0 (🔴 起動エラー: " + msg + ")", "badge-error");
+    setVersionBadge("教員用ツール v4.1 (🔴 起動エラー: " + msg + ")", "badge-error");
     setPasteStatus("🔴 起動エラー: " + msg, "error");
   }
 }
@@ -400,7 +400,7 @@ function initCreatorApp() {
 window.addEventListener("error", function (e) {
   if (!isAppInitialized) {
     const msg = (e && e.message) ? e.message : "不明なエラー";
-    setVersionBadge("教員用ツール v4.0 (🔴 エラー: " + msg + ")", "badge-error");
+    setVersionBadge("教員用ツール v4.1 (🔴 エラー: " + msg + ")", "badge-error");
     setPasteStatus("🔴 エラー: " + msg, "error");
   }
 });
@@ -1100,10 +1100,15 @@ function handleGenerateClick() {
           "   - 【良い例】: 2つの放物線 $y = x^2, y = \\frac{1}{4}x^2$ と、点 $A(3, 0)$ を考える。点 $A$ を通り $y$ 軸に平行な直線と放物線 $y = x^2$ との交点を $B$ とし、点 $C$ の座標は $(\\fbox{ ア }, \\fbox{ イ })$ である。",
           "   - 【悪い例（厳禁）】: 「点\\n$A$\\nを通り\\n$y$\\n軸...」のように単語ごとに改行したり、一文字ごとに $ で中央揃えにすることは絶対に禁止です。",
           "3. 文章は句点（。）まで1行として自然に流れるようにし、単語やフレーズの途中での不自然な改行（\\n）は一切入れないでください。問題文全体として2〜4行程度の横長の美しい文章にまとめてください。",
-          "4. マーク式の場合:",
-          "   - マーク枠は文中にインラインで \\fbox{ ア } や \\fbox{ イ } のように配置してください。",
-          "   - slotsOrChoices には [\"ア\", \"イ\"] のように使用したマーク枠のカタカナ文字を配列で入れてください。",
-          "   - correctAnswer には \"1, 2\" や \"6, 9\" のようにカンマ区切りで各枠の正解を入れてください。",
+          "4. マーク式の場合（★大学入学共通テストの厳格なマーク枠ルールに準拠してください★）:",
+          "   - 【1枠＝1文字の厳格な原則】: 1つのマーク枠 \\fbox{ カタカナ } には、必ず【1桁の数字（0〜9）】または【符号のマイナス（-）】が【1文字だけ】入ります。1つの枠に2桁以上の数字が入ることは絶対にありません。",
+          "   - 【2桁以上の数字の例】: 答えが「15」の場合、必ず2つの枠を使って \\fbox{ ア }\\fbox{ イ } とし、正解は \"1, 5\" としてください。",
+          "   - 【負の数（マイナス）の例】: 答えが「-3」の場合、マイナス符号にも必ず独立した1つの枠を使って \\fbox{ ア }\\fbox{ イ } とし、正解は \"-, 3\" としてください。答えが「-15」なら \\fbox{ ア }\\fbox{ イ }\\fbox{ ウ } で正解は \"-, 1, 5\" です。",
+          "   - 【分数の例】: 答えが「15/4」の場合、必ず \\frac{\\fbox{ ア }\\fbox{ イ }}{\\fbox{ ウ }} とし、正解は \"1, 5, 4\"、slotsOrChoices は [\"ア\", \"イ\", \"ウ\"] としてください。",
+          "   - 【分数が負の数の例】: 答えが「-7/2」の場合、\\frac{\\fbox{ ア }\\fbox{ イ }}{\\fbox{ ウ }} で正解は \"-, 7, 2\" としてください。",
+          "   - 【カタカナ文字の連続順】: マーク枠は「ア, イ, ウ, エ, オ, カ, キ, ク, ケ, コ...」の50音順で順番に漏れなく割り当ててください。",
+          "   - slotsOrChoices には、問題文で使用したマーク枠を左から順に配列（例: [\"ア\", \"イ\", \"ウ\"]）で格納してください。",
+          "   - correctAnswer には、各枠に入る1文字（数字または - ）をカンマ区切りの文字列（例: \"1, 5, 4\" や \"-, 3\"）で格納してください。",
           "5. 選択式の場合:",
           "   - slotsOrChoices には [\"選択肢Aのテキスト\", \"選択肢Bのテキスト\", \"選択肢Cのテキスト\", \"選択肢Dのテキスト\"] を入れてください（2〜4択）。",
           "   - correctAnswer には正解の文字（\"A\", \"B\", \"C\", \"D\" のいずれか）を入れてください。",
@@ -1540,6 +1545,12 @@ function handleExportClick() {
         return String(val || "").replace(/[\r\n\t]+/g, " ").trim();
       };
 
+      // 正解（L列）がスプレッドシートで「2001, 5, 3」等の日付に自動変換されるのを防ぐため、先頭に ' を付与
+      let safeAnswer = sanitizeCell(correctAnswer);
+      if (safeAnswer && safeAnswer.indexOf("'") !== 0) {
+        safeAnswer = "'" + safeAnswer;
+      }
+
       const tsvRow = [
         sanitizeCell(title),
         (type === "マーク" || type === "マーク式") ? "マーク" : "選択",
@@ -1550,7 +1561,7 @@ function handleExportClick() {
         sanitizeCell(choiceCols[3]),
         sanitizeCell(choiceCols[4]),
         sanitizeCell(choiceCols[5]),
-        sanitizeCell(correctAnswer),
+        safeAnswer,
         "公開"
       ].join("\t");
 
