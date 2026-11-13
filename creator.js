@@ -1,5 +1,5 @@
 // ========================================================
-// 数学小テスト 問題作成スタジオ ロジック v4.1 (creator.js)
+// 数学小テスト 問題作成スタジオ ロジック v4.3 (creator.js)
 // GAS (HtmlService iframe) / ローカル両対応・完全版
 // 生徒用画面 (index.html) と同一の純粋ES構文・AIモデル動的自動検出＆タイムアウト無制限版
 // ========================================================
@@ -96,7 +96,7 @@ function resetPasteBoxState() {
     box.classList.remove("paste-ready");
     box.setAttribute("data-placeholder", "💡 ここをクリックして Ctrl + V（または右クリック→貼り付け）");
   }
-  setPasteStatus("🟢 動作準備OK (v4.1) — ファイル選択 / D&D / Ctrl+V すべて対応", "ready");
+  setPasteStatus("🟢 動作準備OK (v4.3) — ファイル選択 / D&D / Ctrl+V すべて対応", "ready");
 }
 
 // ==========================================
@@ -379,8 +379,8 @@ function initCreatorApp() {
       manualCopyBtn.addEventListener("click", handleManualCopyClick);
     }
 
-    setVersionBadge("教員用ツール v4.1 (🟢 動作準備OK)", "badge-ready");
-    setPasteStatus("🟢 動作準備OK (v4.1) — ファイル選択 / D&D / Ctrl+V すべて対応", "ready");
+    setVersionBadge("教員用ツール v4.3 (🟢 動作準備OK)", "badge-ready");
+    setPasteStatus("🟢 動作準備OK (v4.3) — ファイル選択 / D&D / Ctrl+V すべて対応", "ready");
 
     // ブラウザの遅延自動入力（オートフィル）対策
     [300, 1000, 2500].forEach(function (delay) {
@@ -392,7 +392,7 @@ function initCreatorApp() {
   } catch (err) {
     const msg = err && err.message ? err.message : String(err);
     console.error("Creator init error:", err);
-    setVersionBadge("教員用ツール v4.1 (🔴 起動エラー: " + msg + ")", "badge-error");
+    setVersionBadge("教員用ツール v4.3 (🔴 起動エラー: " + msg + ")", "badge-error");
     setPasteStatus("🔴 起動エラー: " + msg, "error");
   }
 }
@@ -400,7 +400,7 @@ function initCreatorApp() {
 window.addEventListener("error", function (e) {
   if (!isAppInitialized) {
     const msg = (e && e.message) ? e.message : "不明なエラー";
-    setVersionBadge("教員用ツール v4.1 (🔴 エラー: " + msg + ")", "badge-error");
+    setVersionBadge("教員用ツール v4.3 (🔴 エラー: " + msg + ")", "badge-error");
     setPasteStatus("🔴 エラー: " + msg, "error");
   }
 });
@@ -1094,6 +1094,9 @@ function handleGenerateClick() {
           "- 出題形式: " + questionType + "（マーク式または選択式）",
           customPrompt ? ("- 追加指示: " + customPrompt) : "",
           "",
+          "【超重要：LaTeXのバックスラッシュ（二重エスケープ厳守）】",
+          "JSONフォーマットとして安全にパースできるよう、LaTeX記法のバックスラッシュ \\ は必ず二重（\\\\frac, \\\\fbox, \\\\triangle 等）で出力してください。単一の \\frac だと \\f がフォームフィード制御文字に化けて数式が破損します。",
+          "",
           "【重要：横長レイアウト＆数式のインライン配置ルール（超縦長化防止）】",
           "1. 小テスト画面で美しく収まるよう、教科書や共通テストと同じ「横長（幅広でコンパクト）な問題用紙風」に作成してください。",
           "2. 文中のアルファベット（x, y, A, B, C 等）や数式、座標、マーク枠（\\fbox{ ア }）は、絶対に独立行（$ ... $）にせず、必ず【インライン数式 $ ... $】を使って自然な日本語文の中にそのまま埋め込んでください。",
@@ -1200,6 +1203,8 @@ function handleGenerateClick() {
           if (cleanJson.endsWith(fence)) {
             cleanJson = cleanJson.slice(0, -fence.length).trim();
           }
+          // LaTeXの単一バックスラッシュによるエスケープ破損 (\frac -> \f フォームフィード等) を自動修復
+          cleanJson = repairJsonLatexEscapes(cleanJson);
           parsedData = JSON.parse(cleanJson);
         } catch (e) {
           console.error("JSON parse error:", candidateText);
@@ -1253,6 +1258,30 @@ function handleGenerateClick() {
 }
 
 // ==========================================
+// LaTeX と JSON 特殊エスケープ (\f, \b, \t 等) の自動修復ユーティリティ
+// ==========================================
+function repairJsonLatexEscapes(rawJson) {
+  if (!rawJson) return "";
+  // 有効なJSONエスケープ以外の \word (特に \frac, \fbox, \begin, \times 等) を \\word に自動修復
+  return rawJson.replace(/(^|[^\\])\\([a-zA-Z]+)/g, function (match, prefix, cmd) {
+    return prefix + "\\\\" + cmd;
+  });
+}
+
+function repairParsedLatex(str) {
+  if (!str) return "";
+  let s = String(str);
+  // 万が一 JSON.parse で \f が 0x0C (Form Feed)、\b が 0x08 に解釈されてしまっていた場合の救済
+  s = s.replace(/\x0c([a-zA-Z]+)/g, function (match, word) {
+    return "\\f" + word;
+  });
+  s = s.replace(/\x08([a-zA-Z]+)/g, function (match, word) {
+    return "\\b" + word;
+  });
+  return s;
+}
+
+// ==========================================
 // 4. プレビューの描画とKaTeX数式レンダリング
 // ==========================================
 function renderPreview(data) {
@@ -1281,9 +1310,132 @@ function renderPreview(data) {
   if (correctAnswerInput) correctAnswerInput.value = data.correctAnswer || "";
 }
 
+
+// ==========================================
+// LaTeX 未ラップ数式（\triangle, \frac, \fbox 等）の自動救済・$ラップ処理
+// ==========================================
+function autoWrapLatexFormulas(text) {
+  if (!text) return "";
+
+  // 1. まずテキストを既存の $...$ 区間で分割（既存の数式デリミタを安全に保護）
+  const parts = text.split(/(\$\$?[^\$]*\$\$?)/g);
+
+  for (let p = 0; p < parts.length; p++) {
+    // 奇数インデックスは既に $...$ で囲まれているためスキップ
+    if (p % 2 === 1) continue;
+
+    const segment = parts[p];
+    if (!segment || segment.indexOf("\\") === -1) continue;
+
+    let result = "";
+    let i = 0;
+    const len = segment.length;
+
+    while (i < len) {
+      if (segment[i] === "\\") {
+        // バックスラッシュ直前の負号や開きカッコを取り込むか判定（例: "- \frac", "(- \frac", "( \frac"）
+        let prefix = "";
+        if (result.length > 0) {
+          const matchPrefix = result.match(/([(\[]?\s*[-−]?\s*)$/);
+          if (matchPrefix && matchPrefix[1] && matchPrefix[1].trim()) {
+            prefix = matchPrefix[1];
+            result = result.substring(0, result.length - prefix.length);
+          }
+        }
+
+        // 数式の範囲を波括弧深さ(depth)を追跡してスキャン
+        let depth = 0;
+        let j = i;
+
+        while (j < len) {
+          const ch = segment[j];
+
+          if (ch === "{" || ch === "[") {
+            depth++;
+            j++;
+            continue;
+          } else if (ch === "}" || ch === "]") {
+            if (depth > 0) depth--;
+            j++;
+            continue;
+          }
+
+          // depth > 0 の間は波括弧の内側なのでそのまま進める
+          if (depth > 0) {
+            j++;
+            continue;
+          }
+
+          // depth === 0 のときの境界判定
+          if (ch === " " || ch === "\t") {
+            let nextNonSpace = j + 1;
+            while (nextNonSpace < len && (segment[nextNonSpace] === " " || segment[nextNonSpace] === "\t")) {
+              nextNonSpace++;
+            }
+            // 空白の後に次のLaTeXコマンド・括弧・演算子が続く場合: \frac{1}{2} + \frac{1}{3} や \fbox{ア} \fbox{イ}
+            if (nextNonSpace < len && (segment[nextNonSpace] === "{" || segment[nextNonSpace] === "\\" || segment[nextNonSpace] === "=" || segment[nextNonSpace] === "+" || segment[nextNonSpace] === "-" || segment[nextNonSpace] === "−")) {
+              j = nextNonSpace;
+              continue;
+            }
+            // 空白の後に英数字が続く場合（例: \triangle OAB や \angle ABC）
+            if (nextNonSpace < len && /^[A-Za-z0-9]/.test(segment[nextNonSpace])) {
+              j = nextNonSpace;
+              continue;
+            }
+            // それ以外の空白は数式の区切りとみなす
+            break;
+          }
+
+          // バックスラッシュはコマンド継続
+          if (ch === "\\") {
+            j++;
+            continue;
+          }
+
+          // 数式として有効なASCII英数字・標準演算子
+          if (/[A-Za-z0-9+\-*\/=^_,.<>|:;!~]/.test(ch)) {
+            j++;
+            continue;
+          }
+
+          // 開きカッコを取り込んでいた場合に対応する閉じカッコを取り込む
+          if ((ch === ")" && prefix.indexOf("(") !== -1) || (ch === "]" && prefix.indexOf("[") !== -1)) {
+            j++;
+            break;
+          }
+
+          // 日本語文字（漢字、ひらがな、全角記号等）や句読点（。、など）が来たら数式終了！
+          break;
+        }
+
+        let mathFormula = prefix + segment.substring(i, j);
+        mathFormula = mathFormula.trim();
+
+        // 文末の句読点（。や、など）が末尾に残っていればトリム
+        let trailingPunct = "";
+        const punctMatch = mathFormula.match(/([,.:;]+)$/);
+        if (punctMatch && depth === 0) {
+          trailingPunct = punctMatch[1];
+          mathFormula = mathFormula.slice(0, -trailingPunct.length).trim();
+        }
+
+        result += " $" + mathFormula + "$ " + trailingPunct;
+        i = j;
+      } else {
+        result += segment[i];
+        i++;
+      }
+    }
+
+    parts[p] = result;
+  }
+
+  return parts.join("");
+}
+
 function formatMarkdownMath(text) {
   if (!text) return "";
-  let s = String(text);
+  let s = repairParsedLatex(String(text));
 
   // 1. \[ ... \] を $ ... $ に変換（Geminiが多用するディスプレイ数式をインライン化）
   s = s.replace(/\\\[([\s\S]*?)\\\]/g, function (match, inner) {
@@ -1299,6 +1451,9 @@ function formatMarkdownMath(text) {
   s = s.replace(/\\\(([\s\S]*?)\\\)/g, function (match, inner) {
     return " $" + inner.trim() + "$ ";
   });
+
+  // 4. $ ... $ で囲まれていない裸の LaTeX コマンド（\\triangle, \\frac, \\fbox 等）を自動検出して $ ... $ で包む
+  s = autoWrapLatexFormulas(s);
 
   // 4. 文中の単独改行を結合（句点やコロン、箇条書き記号以外での改行を自然に横長に接続）
   const lines = s.split(/\r?\n/);
